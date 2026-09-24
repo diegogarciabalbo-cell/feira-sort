@@ -1,33 +1,42 @@
 # 🍊 Feira Sort
 
-Jogo de puzzle em C++: organize as frutas da feira até que cada caixote tenha um só tipo de fruta.
+**Jogo de puzzle pensado para o público 50+.** Ajude o Seu Zé a arrumar a banca: organize as frutas até que cada caixote tenha um só tipo de fruta.
 
-![Tela do jogo mostrando a dica](captura.png)
+![Tela inicial](imagens/menu.png)
 
-## A ideia
+## Por que este jogo existe
 
-Jogos de "sort" como Magic Sort e Bus Fever Party fazem muito sucesso, mas os jogadores reclamam de excesso de anúncios e de fases que travam sem aviso. O Feira Sort foi pensado para o **público 50+**:
+Jogos de "sort" como Magic Sort e Bus Fever Party são sucesso mundial, mas os jogadores reclamam de **excesso de anúncios**, **cronômetros que dão pressa** e **fases que travam sem aviso**. O Feira Sort resolve cada uma dessas dores para quem tem mais de 50 anos:
 
-- Sem cronômetro e sem anúncios
-- Frutas grandes, com **formatos diferentes** (não depende só da cor)
-- Desfazer ilimitado
-- **Dica que sempre funciona**: o jogo resolve a feira sozinho e mostra a próxima jogada certa
-- **Aviso de travamento**: se uma jogada deixa a feira sem solução, o jogo avisa na hora
-- Toda feira sorteada é verificada e **sempre tem solução**
-- Fases com dificuldade crescente (de 3 a 6 frutas), e o jogo **lembra a fase** onde você parou
-- Sons gerados pelo próprio código (sem arquivos de áudio), com botão para desligar
-
-## Arquivos
-
-| Arquivo | Descrição |
+| Problema comum | Como o Feira Sort resolve |
 |---|---|
-| `feira_grafico.cpp` | Jogo completo, com gráficos e mouse (raylib) |
-| `Poppins-Bold.ttf` | Fonte com acentos (precisa ficar na mesma pasta do jogo) |
-| `feira_sort.cpp` | Primeira versão, no terminal |
+| Anúncios a cada fase | Nenhum anúncio |
+| Cronômetro e pressa | Sem tempo: jogue com calma |
+| Cores difíceis de distinguir | Cada fruta tem um **formato** diferente |
+| Letras pequenas | Botões e textos grandes, com ícones |
+| Não sei o que fazer | O **Seu Zé**, feirante, orienta a cada passo |
+| Travei e não percebi | O jogo **avisa na hora** e destaca o botão DESFAZER |
+| Dica que não ajuda | A dica segue um **plano completo**: seguindo as dicas, você sempre termina |
+
+![Jogando](imagens/jogo.png)
+
+## Recursos
+
+- Tela inicial, tutorial "Como jogar" e fases com dificuldade crescente (3 a 7 frutas)
+- Estrelas no fim da fase (3 estrelas sem usar dicas)
+- Confete, animações suaves e frutas que "pulam" ao cair no caixote
+- Música de feira e efeitos sonoros **gerados pelo próprio código**, com botão para desligar
+- Progresso salvo automaticamente
+- Tela que se adapta: **deitada** (computador) ou **em pé** (celular)
+- Toda arte é desenhada por código, sem nenhuma imagem
+
+| Vitória | Celular |
+|---|---|
+| ![Vitória](imagens/vitoria.png) | ![Celular](imagens/celular.png) |
 
 ## Como rodar (Linux)
 
-Instale a raylib (só na primeira vez):
+Instale a raylib 4.2 (só na primeira vez):
 
 ```bash
 sudo apt install build-essential git libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libgl1-mesa-dev
@@ -35,32 +44,40 @@ git clone --depth 1 --branch 4.2.0 https://github.com/raysan5/raylib.git
 cd raylib/src && make PLATFORM=PLATFORM_DESKTOP && sudo make install && cd ../..
 ```
 
-Compile e jogue:
+Compile e jogue (a fonte `Poppins-Bold.ttf` precisa ficar na mesma pasta):
 
 ```bash
-g++ -std=c++17 -O2 feira_grafico.cpp -o feira_grafico -lraylib -lGL -lm -lpthread -ldl -lrt -lX11
-./feira_grafico
+make
+./feira_sort
 ```
 
-## Conceitos de programação usados
+Tecla **F11**: tela cheia.
 
-- **Busca em profundidade (DFS) com backtracking e memorização** (`unordered_set`) para resolver a feira, gerar dicas e detectar travamento
-- Poda da busca: ignora jogadas inúteis e trata caixotes vazios como equivalentes
-- `vector` como pilha (caixotes) e histórico de estados para o "desfazer"
-- Laço de jogo: entrada → atualização → desenho, a 60 quadros por segundo
-- Animação com interpolação suave (smoothstep) em arco
-- Síntese de áudio: ondas senoidais com envelope de ataque e decaimento
-- Fonte TrueType com caracteres UTF-8 (acentos do português)
-- Frutas desenhadas só com formas geométricas, sem imagens
-- Gravação do progresso em arquivo (`fstream`)
+## Organização do código
+
+| Arquivo | O que faz |
+|---|---|
+| `src/regras.h` | Regras do jogo, geração de fases e o **resolvedor** |
+| `src/arte.h` | Todo o desenho: cenário, frutas, caixotes, feirante, botões, confete |
+| `src/som.h` | Síntese de áudio: efeitos e música |
+| `src/main.cpp` | Telas, layout adaptável e controle do jogo |
+
+## Destaques técnicos
+
+- **Busca em profundidade (DFS) com backtracking e memorização** (`unordered_set` de estados), usada para:
+  - garantir que toda fase sorteada tem solução
+  - dar dicas e detectar quando o jogador travou
+- **Ordenação heurística das jogadas** (empilhar frutas iguais primeiro, usar caixote vazio por último): reduziu a solução média das fases difíceis de cerca de 30 para 23 jogadas
+- **Plano de dica em cache**: evita que dicas seguidas fiquem andando em círculos (bug encontrado por teste automatizado)
+- Tela virtual com câmera 2D: o mesmo layout funciona em qualquer resolução
+- Síntese de som: ondas senoidais com harmônicos e envelope de ataque e decaimento
 
 ## Próximos passos
 
 - [ ] Versão web jogável no navegador
 - [ ] Versão Android para a Google Play
-- [ ] Fila de freguesas pedindo caixotes completos
 - [ ] Documento de casos de teste (QA)
 
 ## Créditos
 
-Fonte [Poppins](https://fonts.google.com/specimen/Poppins), da Indian Type Foundry, sob a SIL Open Font License 1.1.
+Criado por **Diego Garcia Balbo**. Fonte [Poppins](https://fonts.google.com/specimen/Poppins) (Indian Type Foundry), sob a SIL Open Font License 1.1.
