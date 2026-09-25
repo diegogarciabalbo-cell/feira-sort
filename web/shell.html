@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="description" content="Feira Sort: jogo de organizar frutas pensado para o público 50+. Sem anúncios e sem pressa.">
+  <meta name="theme-color" content="#d23430">
+  <title>Feira Sort</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #8acdf2; touch-action: none; }
+    canvas { display: block; position: fixed; top: 0; left: 0; outline: none; touch-action: none; }
+    #carregando {
+      position: fixed; inset: 0; display: flex; flex-direction: column; gap: 16px;
+      align-items: center; justify-content: center; text-align: center;
+      font: bold 30px system-ui, sans-serif; color: #54341c;
+      background: linear-gradient(#8acdf2, #ffeecd);
+    }
+    #carregando small { font-size: 18px; font-weight: normal; }
+  </style>
+</head>
+<body>
+  <div id="carregando">🍊 Carregando a feira...<small>Só um instantinho</small></div>
+  <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+  <script>
+    var Module = {
+      canvas: document.getElementById('canvas'),
+      onRuntimeInitialized: function () {
+        document.getElementById('carregando').style.display = 'none';
+      },
+      print: function (t) { console.log(t); },
+      printErr: function (t) { console.warn(t); }
+    };
+
+    // Os navegadores so liberam o som depois que a pessoa toca na tela.
+    // Este codigo "destrava" o audio do jogo a cada toque, clique ou tecla.
+    function destravarSom() {
+      try {
+        if (window.miniaudio && miniaudio.devices) {
+          miniaudio.devices.forEach(function (d) {
+            if (d && d.webaudio && d.webaudio.state !== 'running') d.webaudio.resume();
+          });
+        }
+      } catch (e) {}
+    }
+    ['pointerdown', 'touchstart', 'touchend', 'mousedown', 'click', 'keydown'].forEach(function (evento) {
+      document.addEventListener(evento, destravarSom, true);
+    });
+  </script>
+  {{{ SCRIPT }}}
+</body>
+</html>

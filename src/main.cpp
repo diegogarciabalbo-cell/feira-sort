@@ -21,6 +21,40 @@
 //  PROGRESSO SALVO
 // ============================================================
 
+#if defined(PLATFORM_WEB)
+#include <emscripten/emscripten.h>
+
+// No navegador, o progresso fica guardado no localStorage
+EM_JS(int, lerFaseNavegador, (), {
+    try { var v = localStorage.getItem('feira_sort_fase'); return v ? parseInt(v) : 0; } catch (e) { return 0; }
+});
+EM_JS(void, gravarFaseNavegador, (int fase), {
+    try { localStorage.setItem('feira_sort_fase', fase); } catch (e) {}
+});
+EM_JS(int, larguraNavegador, (), { return window.innerWidth; });
+EM_JS(int, alturaNavegador, (), { return window.innerHeight; });
+// Telas modernas tem mais pixels que o navegador informa (ate 2x)
+EM_JS(double, densidadePixels, (), { return Math.min(window.devicePixelRatio || 1, 2); });
+// O canvas desenha em alta resolucao, mas ocupa exatamente a janela
+EM_JS(void, ajustarTamanhoCanvas, (int largura, int altura), {
+    var c = Module.canvas;
+    var w = largura + 'px', h = altura + 'px';
+    if (c.style.width !== w || c.style.height !== h) {
+        c.style.setProperty('width', w, 'important');
+        c.style.setProperty('height', h, 'important');
+    }
+});
+
+int carregarFase(bool& primeiraVez) {
+    int fase = lerFaseNavegador();
+    primeiraVez = fase == 0;
+    return max(1, fase);
+}
+
+void salvarFase(int fase) { gravarFaseNavegador(fase); }
+
+#else
+
 string caminhoProgresso() {
     return string(GetApplicationDirectory()) + "progresso.txt";
 }
@@ -36,6 +70,8 @@ void salvarFase(int fase) {
     ofstream arquivo(caminhoProgresso());
     arquivo << fase;
 }
+
+#endif
 
 // Fonte Poppins com os acentos do portugues
 Font carregarFonte() {
@@ -85,10 +121,16 @@ struct Layout {
     Botao desfazer, dica, reiniciar, nova, inicio, som;
 };
 
-Layout montarLayout(float W, float H, bool retrato, int total, bool somLigado) {
+// Desloca um retangulo na vertical
+void descer(Rectangle& r, float dy) { r.y += dy; }
+
+Layout montarLayout(float W, float Htotal, bool retrato, int total, bool somLigado) {
     Layout L;
     L.W = W;
-    L.H = H;
+    L.H = Htotal;
+    // Em telas muito altas, o jogo fica centralizado em vez de espalhado
+    float H = min(Htotal, (retrato ? 1280.0f : 720.0f) * 1.08f);
+    float dy = (Htotal - H) / 2;
     L.retrato = retrato;
     Icone iconeSom = somLigado ? ICONE_SOM : ICONE_MUDO;
     Color marrom = COR_MARROM;
@@ -147,6 +189,16 @@ Layout montarLayout(float W, float H, bool retrato, int total, bool somLigado) {
         L.inicio = {{20 + bw + esp, y2, bw, bh}, "INÍCIO", marrom, ICONE_CASA, 24};
         L.som = {{20 + 2 * (bw + esp), y2, bw, bh}, "SOM", marrom, iconeSom, 24};
     }
+
+    // Aplica o deslocamento vertical em tudo
+    for (Rectangle& r : L.caixotes) descer(r, dy);
+    for (float& y : L.prateleiras) y += dy;
+    L.feirante.y += dy;
+    L.pontaBalao.y += dy;
+    for (Rectangle* r : {&L.balao, &L.pilulaFase, &L.pilulaJogadas})
+        descer(*r, dy);
+    for (Botao* b : {&L.desfazer, &L.dica, &L.reiniciar, &L.nova, &L.inicio, &L.som})
+        descer(b->r, dy);
     return L;
 }
 
@@ -525,16 +577,23 @@ struct Jogo {
 
     Rectangle botaoJogar, botaoAjuda, botaoSomMenu;
 
+    // Em telas muito altas, o menu fica centralizado na vertical
+    static float deslocamentoMenu(float H, bool retrato) {
+        float util = min(H, (retrato ? 1280.0f : 720.0f) * 1.08f);
+        return (H - util) / 2;
+    }
+
     void montarMenu(float W, float H, bool retrato) {
+        float dy = deslocamentoMenu(H, retrato);
         if (!retrato) {
             float cx = W * 0.58f;
-            botaoJogar = {cx - 200, 272, 400, 100};
-            botaoAjuda = {cx - 200, 394, 250, 66};
-            botaoSomMenu = {cx + 64, 394, 136, 66};
+            botaoJogar = {cx - 200, 272 + dy, 400, 100};
+            botaoAjuda = {cx - 200, 394 + dy, 250, 66};
+            botaoSomMenu = {cx + 64, 394 + dy, 136, 66};
         } else {
-            botaoJogar = {W / 2 - 220, 520, 440, 110};
-            botaoAjuda = {W / 2 - 220, 656, 280, 72};
-            botaoSomMenu = {W / 2 + 76, 656, 144, 72};
+            botaoJogar = {W / 2 - 220, 520 + dy, 440, 110};
+            botaoAjuda = {W / 2 - 220, 656 + dy, 280, 72};
+            botaoSomMenu = {W / 2 + 76, 656 + dy, 144, 72};
         }
     }
 
@@ -564,7 +623,9 @@ struct Jogo {
     }
 
     void desenharMenu(float W, float H, bool retrato, Vector2 mouse, float tempo) {
-        float mesa = retrato ? H - 250 : H - 150;
+        float dy = deslocamentoMenu(H, retrato);
+        float util = H - 2 * dy;
+        float mesa = (retrato ? util - 250 : util - 150) + dy;
         desenharCeu(W, H, tempo);
         desenharBandeirinhas(W, 70, tempo);
         desenharToldo(W);
@@ -592,7 +653,7 @@ struct Jogo {
 
         // Logo
         float cx = retrato ? W / 2 : W * 0.58f;
-        float yLogo = retrato ? 150 : 62;
+        float yLogo = (retrato ? 150 : 62) + dy;
         float tamanhoLogo = retrato ? 118 : 104;
         if (retrato) {
             textoContorno("FEIRA", W / 2, yLogo, tamanhoLogo, COR_CREME, Color{150, 50, 40, 255}, 7);
@@ -661,97 +722,134 @@ struct Jogo {
 };
 
 // ============================================================
+//  UM QUADRO DO JOGO (chamado 60 vezes por segundo)
+//  Fica numa funcao separada porque no navegador quem chama
+//  e o proprio navegador, e nao um laco "while".
+// ============================================================
+
+Jogo* jogoAtual = nullptr;
+
+void quadro() {
+    Jogo& jogo = *jogoAtual;
+    float dt = min(GetFrameTime(), 0.05f);
+    float tempo = (float)GetTime();
+
+#if defined(PLATFORM_WEB)
+    // No navegador, a tela do jogo acompanha o tamanho da janela, em alta resolucao
+    int larguraNav = larguraNavegador(), alturaNav = alturaNavegador();
+    double densidade = densidadePixels();
+    int larguraPixels = (int)(larguraNav * densidade), alturaPixels = (int)(alturaNav * densidade);
+    if (larguraPixels != GetScreenWidth() || alturaPixels != GetScreenHeight()) SetWindowSize(larguraPixels, alturaPixels);
+    ajustarTamanhoCanvas(larguraNav, alturaNav);
+#else
+    if (IsKeyPressed(KEY_F11)) ToggleFullscreen();
+#endif
+
+    // Tela virtual: 1280x720 deitada ou 720x1280 em pe, esticada para caber.
+    // Escolhe a orientacao em que o jogo fica maior na tela.
+    float larguraReal = (float)GetScreenWidth(), alturaReal = (float)GetScreenHeight();
+    float escalaDeitada = min(larguraReal / 1280, alturaReal / 720);
+    float escalaEmPe = min(larguraReal / 720, alturaReal / 1280);
+    bool retrato = escalaEmPe > escalaDeitada;
+    float baseW = retrato ? 720 : 1280, baseH = retrato ? 1280 : 720;
+    float escala = min(larguraReal / baseW, alturaReal / baseH);
+    float W = larguraReal / escala, H = alturaReal / escala;
+    Camera2D camera = {};
+    camera.zoom = escala;
+
+    // Mouse ou toque na tela (celular)
+    static int toquesAntes = 0;
+    int toques = GetTouchPointCount();
+    bool toqueNovo = toques > 0 && toquesAntes == 0;
+    toquesAntes = toques;
+    Vector2 posicao = toques > 0 ? GetTouchPosition(0) : GetMousePosition();
+    Vector2 mouse = GetScreenToWorld2D(posicao, camera);
+    bool clicou = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || toqueNovo;
+
+    jogo.sons.atualizarMusica();
+    atualizarParticulas(dt);
+    if (jogo.tempoFala > 0 && jogo.tempoFala < 50) jogo.tempoFala -= dt;
+    if (jogo.tempoFala <= 0) jogo.humor = 0;
+    if (jogo.tempoDica > 0) jogo.tempoDica -= dt;
+    if (jogo.tempoTremor > 0) jogo.tempoTremor -= dt;
+
+    Layout L = montarLayout(W, H, retrato, max(1, (int)jogo.feira.size()), jogo.sons.ligado);
+
+    // ----- Atualizacao -----
+    if (jogo.mostrarAjuda) {
+        if (clicou && dentro(mouse, jogo.botaoEntendi(W, H))) {
+            jogo.sons.tocar(jogo.sons.clique);
+            jogo.mostrarAjuda = false;
+        }
+    } else if (jogo.tela == MENU) {
+        jogo.atualizarMenu(mouse, clicou);
+    } else if (jogo.ganhou && clicou && dentro(mouse, jogo.botaoProximaFase(L)) && jogo.tempoVitoria > 0.6f) {
+        jogo.sons.tocar(jogo.sons.clique);
+        jogo.fase++;
+        jogo.comecarFase(true);
+        jogo.falar("Fase " + to_string(jogo.fase) + "! Chegou mais fruta na banca.", 4, 1);
+    } else {
+        jogo.atualizarJogo(dt, mouse, clicou, L);
+    }
+
+    // Recalcula o layout: o numero de caixotes pode ter mudado neste quadro
+    L = montarLayout(W, H, retrato, max(1, (int)jogo.feira.size()), jogo.sons.ligado);
+
+    // Cursor de maozinha sobre o que da para clicar
+    bool sobreClicavel = false;
+    if (jogo.mostrarAjuda) sobreClicavel = dentro(mouse, jogo.botaoEntendi(W, H));
+    else if (jogo.tela == MENU)
+        sobreClicavel = dentro(mouse, jogo.botaoJogar) || dentro(mouse, jogo.botaoAjuda) || dentro(mouse, jogo.botaoSomMenu);
+    else if (jogo.ganhou) sobreClicavel = dentro(mouse, jogo.botaoProximaFase(L));
+    else {
+        for (const Botao* b : {&L.desfazer, &L.dica, &L.reiniciar, &L.nova, &L.inicio, &L.som})
+            if (dentro(mouse, b->r)) sobreClicavel = true;
+        for (const Rectangle& r : L.caixotes)
+            if (dentro(mouse, areaDeClique(r))) sobreClicavel = true;
+    }
+    SetMouseCursor(sobreClicavel ? MOUSE_CURSOR_POINTING_HAND : MOUSE_CURSOR_DEFAULT);
+
+    // ----- Desenho -----
+    BeginDrawing();
+    ClearBackground(COR_CREME);
+    BeginMode2D(camera);
+    if (jogo.tela == MENU) jogo.desenharMenu(W, H, retrato, mouse, tempo);
+    else jogo.desenharJogo(L, mouse, tempo);
+    if (jogo.mostrarAjuda) jogo.desenharAjuda(W, H, mouse);
+    EndMode2D();
+    EndDrawing();
+}
+
+// ============================================================
 //  MAIN
 // ============================================================
 
 int main() {
     SetTraceLogLevel(LOG_WARNING);
     SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
+#if defined(PLATFORM_WEB)
+    InitWindow((int)(larguraNavegador() * densidadePixels()), (int)(alturaNavegador() * densidadePixels()), "Feira Sort");
+    ajustarTamanhoCanvas(larguraNavegador(), alturaNavegador());
+#else
     InitWindow(1280, 720, "Feira Sort");
     SetWindowMinSize(480, 480);
     SetTargetFPS(60);
+#endif
     fonte = carregarFonte();
 
-    Jogo jogo;
+    static Jogo jogo;
+    jogoAtual = &jogo;
     jogo.sons.carregar();
     jogo.fase = carregarFase(jogo.primeiraVez);
 
-    while (!WindowShouldClose()) {
-        float dt = min(GetFrameTime(), 0.05f);
-        float tempo = (float)GetTime();
-
-        if (IsKeyPressed(KEY_F11)) ToggleFullscreen();
-
-        // Tela virtual: 1280x720 deitada ou 720x1280 em pe, esticada para caber
-        float larguraReal = (float)GetScreenWidth(), alturaReal = (float)GetScreenHeight();
-        bool retrato = alturaReal > larguraReal * 1.05f;
-        float baseW = retrato ? 720 : 1280, baseH = retrato ? 1280 : 720;
-        float escala = min(larguraReal / baseW, alturaReal / baseH);
-        float W = larguraReal / escala, H = alturaReal / escala;
-        Camera2D camera = {};
-        camera.zoom = escala;
-        Vector2 mouse = GetScreenToWorld2D(GetMousePosition(), camera);
-        bool clicou = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
-
-        jogo.sons.atualizarMusica();
-        atualizarParticulas(dt);
-        if (jogo.tempoFala > 0 && jogo.tempoFala < 50) jogo.tempoFala -= dt;
-        if (jogo.tempoFala <= 0) jogo.humor = 0;
-        if (jogo.tempoDica > 0) jogo.tempoDica -= dt;
-        if (jogo.tempoTremor > 0) jogo.tempoTremor -= dt;
-
-        Layout L = montarLayout(W, H, retrato, max(1, (int)jogo.feira.size()), jogo.sons.ligado);
-
-        // ----- Atualizacao -----
-        if (jogo.mostrarAjuda) {
-            if (clicou && dentro(mouse, jogo.botaoEntendi(W, H))) {
-                jogo.sons.tocar(jogo.sons.clique);
-                jogo.mostrarAjuda = false;
-            }
-        } else if (jogo.tela == MENU) {
-            jogo.atualizarMenu(mouse, clicou);
-            L = montarLayout(W, H, retrato, (int)jogo.feira.size(), jogo.sons.ligado);
-        } else {
-            if (jogo.ganhou && clicou && dentro(mouse, jogo.botaoProximaFase(L)) && jogo.tempoVitoria > 0.6f) {
-                jogo.sons.tocar(jogo.sons.clique);
-                jogo.fase++;
-                jogo.comecarFase(true);
-                jogo.falar("Fase " + to_string(jogo.fase) + "! Chegou mais fruta na banca.", 4, 1);
-                L = montarLayout(W, H, retrato, (int)jogo.feira.size(), jogo.sons.ligado);
-            } else {
-                jogo.atualizarJogo(dt, mouse, clicou, L);
-            }
-        }
-
-        // Cursor de maozinha sobre o que da para clicar
-        bool sobreClicavel = false;
-        if (jogo.mostrarAjuda) sobreClicavel = dentro(mouse, jogo.botaoEntendi(W, H));
-        else if (jogo.tela == MENU)
-            sobreClicavel = dentro(mouse, jogo.botaoJogar) || dentro(mouse, jogo.botaoAjuda) || dentro(mouse, jogo.botaoSomMenu);
-        else if (jogo.ganhou) sobreClicavel = dentro(mouse, jogo.botaoProximaFase(L));
-        else {
-            for (const Botao* b : {&L.desfazer, &L.dica, &L.reiniciar, &L.nova, &L.inicio, &L.som})
-                if (dentro(mouse, b->r)) sobreClicavel = true;
-            for (const Rectangle& r : L.caixotes)
-                if (dentro(mouse, areaDeClique(r))) sobreClicavel = true;
-        }
-        SetMouseCursor(sobreClicavel ? MOUSE_CURSOR_POINTING_HAND : MOUSE_CURSOR_DEFAULT);
-
-        // ----- Desenho -----
-        // Recalcula o layout: o numero de caixotes pode ter mudado neste quadro
-        L = montarLayout(W, H, retrato, max(1, (int)jogo.feira.size()), jogo.sons.ligado);
-        BeginDrawing();
-        ClearBackground(COR_CREME);
-        BeginMode2D(camera);
-        if (jogo.tela == MENU) jogo.desenharMenu(W, H, retrato, mouse, tempo);
-        else jogo.desenharJogo(L, mouse, tempo);
-        if (jogo.mostrarAjuda) jogo.desenharAjuda(W, H, mouse);
-        EndMode2D();
-        EndDrawing();
-    }
+#if defined(PLATFORM_WEB)
+    emscripten_set_main_loop(quadro, 0, 1);  // o navegador chama quadro() a cada tela
+#else
+    while (!WindowShouldClose()) quadro();
 
     jogo.sons.descarregar();
     if (fonte.texture.id != GetFontDefault().texture.id) UnloadFont(fonte);
     CloseWindow();
+#endif
     return 0;
 }

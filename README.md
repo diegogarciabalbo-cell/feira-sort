@@ -2,6 +2,9 @@
 
 **Jogo de puzzle pensado para o público 50+.** Ajude o Seu Zé a arrumar a banca: organize as frutas até que cada caixote tenha um só tipo de fruta.
 
+### ▶️ [Jogue agora no navegador](https://diegogarciabalbo-cell.github.io/feira-sort/)
+Funciona no computador e no celular, sem instalar nada.
+
 ![Tela inicial](imagens/menu.png)
 
 ## Por que este jogo existe
@@ -53,6 +56,16 @@ make
 
 Tecla **F11**: tela cheia.
 
+## Versão web (navegador)
+
+O mesmo código C++ é compilado para WebAssembly com o Emscripten e publicado pelo GitHub Pages:
+
+```bash
+./compilar-web.sh
+```
+
+No navegador, o progresso fica salvo no `localStorage`, a tela acompanha o tamanho da janela e o jogo aceita toque no celular.
+
 ## Organização do código
 
 | Arquivo | O que faz |
@@ -61,6 +74,8 @@ Tecla **F11**: tela cheia.
 | `src/arte.h` | Todo o desenho: cenário, frutas, caixotes, feirante, botões, confete |
 | `src/som.h` | Síntese de áudio: efeitos e música |
 | `src/main.cpp` | Telas, layout adaptável e controle do jogo |
+| `web/shell.html` | Página que carrega o jogo no navegador |
+| `compilar-web.sh` | Compila a versão web para a pasta `docs/` |
 
 ## Destaques técnicos
 
@@ -74,7 +89,7 @@ Tecla **F11**: tela cheia.
 
 ## Próximos passos
 
-- [ ] Versão web jogável no navegador
+- [x] Versão web jogável no navegador
 - [ ] Versão Android para a Google Play
 - [ ] Documento de casos de teste (QA)
 
