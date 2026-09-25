@@ -16,7 +16,16 @@ const int CAPACIDADE = 4;       // frutas por caixote
 const int CAIXOTES_VAZIOS = 2;  // caixotes vazios para manobrar
 const int LIMITE_BUSCA = 200000;
 
-enum Fruta { MACA, BANANA, UVA, LIMAO, LARANJA, MORANGO, MELANCIA, TOTAL_FRUTAS };
+enum Fruta {
+    // Frutas de todo lugar
+    MACA, BANANA, UVA, LIMAO, LARANJA, MORANGO, MELANCIA,
+    // Frutas regionais (uma dupla para cada feira)
+    GOIABA, JABUTICABA,  // Belo Horizonte
+    CAJU, MANGA,         // Caruaru
+    ACAI, CUPUACU,       // Belem
+    BERGAMOTA, PESSEGO,  // Porto Alegre
+    TOTAL_FRUTAS
+};
 
 // Um caixote e uma pilha: o fim do vetor (back) e a fruta de cima.
 using Caixote = vector<int>;
@@ -161,31 +170,18 @@ bool resolver(Feira feira, vector<Jogada>& caminho, bool& estourouLimite) {
 //  FASES
 // ============================================================
 
-// Quantas frutas diferentes cada fase tem
-int frutasDaFase(int fase) {
-    if (fase <= 2) return 3;
-    if (fase <= 4) return 4;
-    if (fase <= 6) return 5;
-    if (fase <= 9) return 6;
-    return 7;
-}
-
 // A partir da fase 6 aparecem frutas escondidas no saquinho (estilo Magic Sort)
 const int PRIMEIRA_FASE_ESCONDIDA = 6;
 
-float chanceEscondida(int fase) {
-    if (fase < PRIMEIRA_FASE_ESCONDIDA) return 0;
-    return min(0.55f, 0.15f + 0.05f * (fase - PRIMEIRA_FASE_ESCONDIDA));
-}
-
-// Monta uma feira com "qtdFrutas" tipos, sempre com solucao
-Feira criarFeira(int qtdFrutas, mt19937& gerador) {
+// Monta uma feira com "qtdFrutas" tipos, sempre com solucao.
+// As "obrigatorias" sempre entram (as frutas da regiao); o resto sai das "opcionais".
+Feira criarFeira(const vector<int>& obrigatorias, vector<int> opcionais, int qtdFrutas, mt19937& gerador) {
     while (true) {
-        // Sorteia quais frutas entram
-        vector<int> tipos;
-        for (int f = 0; f < TOTAL_FRUTAS; f++) tipos.push_back(f);
-        shuffle(tipos.begin(), tipos.end(), gerador);
-        tipos.resize(qtdFrutas);
+        vector<int> tipos(obrigatorias.begin(), obrigatorias.begin() + min((int)obrigatorias.size(), qtdFrutas));
+        shuffle(opcionais.begin(), opcionais.end(), gerador);
+        for (int f : opcionais) {
+            if ((int)tipos.size() < qtdFrutas) tipos.push_back(f);
+        }
 
         vector<int> todas;
         for (int tipo : tipos) {
@@ -193,15 +189,16 @@ Feira criarFeira(int qtdFrutas, mt19937& gerador) {
         }
         shuffle(todas.begin(), todas.end(), gerador);
 
-        Feira feira(qtdFrutas + CAIXOTES_VAZIOS);
+        int total = tipos.size();
+        Feira feira(total + CAIXOTES_VAZIOS);
         int pos = 0;
-        for (int c = 0; c < qtdFrutas; c++) {
+        for (int c = 0; c < total; c++) {
             for (int i = 0; i < CAPACIDADE; i++) feira[c].push_back(todas[pos++]);
         }
 
         // Nao queremos caixote ja pronto no inicio
         bool temPronto = false;
-        for (int c = 0; c < qtdFrutas; c++) {
+        for (int c = 0; c < total; c++) {
             if (uniforme(feira[c])) temPronto = true;
         }
         if (temPronto) continue;
@@ -227,10 +224,11 @@ struct Nivel {
     Escondidas escondidas;
 };
 
-Nivel gerarNivel(int qtdFrutas, float chanceDeEsconder, unsigned semente) {
+Nivel gerarNivel(const vector<int>& obrigatorias, const vector<int>& opcionais, int qtdFrutas, float chanceDeEsconder,
+                 unsigned semente) {
     mt19937 gerador(semente);
     Nivel n;
-    n.feira = criarFeira(qtdFrutas, gerador);
+    n.feira = criarFeira(obrigatorias, opcionais, qtdFrutas, gerador);
     n.escondidas.assign(n.feira.size(), vector<bool>(CAPACIDADE, false));
     uniform_real_distribution<float> sorteio(0, 1);
     for (int c = 0; c < qtdFrutas; c++) {
@@ -239,15 +237,6 @@ Nivel gerarNivel(int qtdFrutas, float chanceDeEsconder, unsigned semente) {
         }
     }
     return n;
-}
-
-Nivel nivelDaFase(int fase) {
-    return gerarNivel(frutasDaFase(fase), chanceEscondida(fase), (unsigned)fase * 2654435761u + 12345u);
-}
-
-// Desafio do dia: a data (ex.: 20260925) vira a semente
-Nivel nivelDoDesafio(int data) {
-    return gerarNivel(6, 0.3f, (unsigned)data * 7919u + 777u);
 }
 
 // Revela o grupo de frutas de cima de cada caixote

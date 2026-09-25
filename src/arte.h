@@ -281,6 +281,130 @@ void desenharFruta(int fruta, Vector2 c, float escala = 1.0f) {
             for (Vector2 s : sementes) DrawEllipse((int)(centro.x + s.x * R), (int)(centro.y + s.y * R), R * 0.05f, R * 0.08f, Color{40, 20, 20, 255});
             break;
         }
+        case GOIABA: {
+            // Goiaba cortada ao meio: casca verde e polpa rosada com sementes
+            DrawCircleV(c, r + 2.5f, Color{96, 128, 34, 255});
+            DrawCircleV(c, r, Color{176, 204, 74, 255});
+            DrawCircleV(c, r * 0.84f, Color{244, 118, 118, 255});
+            DrawCircleGradient((int)(c.x - r * 0.2f), (int)(c.y - r * 0.2f), r * 0.7f, Fade(Color{255, 176, 164, 255}, 0.9f), Fade(Color{244, 118, 118, 255}, 0));
+            DrawCircleV(c, r * 0.42f, Color{250, 150, 140, 255});
+            for (int i = 0; i < 9; i++) {
+                float a = i * 2 * PI / 9;
+                DrawCircleV(mais(c, cosf(a) * r * 0.55f, sinf(a) * r * 0.55f), r * 0.07f, Color{255, 232, 196, 255});
+            }
+            DrawEllipse((int)(c.x - r * 0.4f), (int)(c.y - r * 0.55f), r * 0.16f, r * 0.08f, Fade(WHITE, 0.6f));
+            break;
+        }
+        case JABUTICABA: {
+            // Tres jabuticabas pretinhas presas num galhinho
+            DrawLineEx(mais(c, -r * 1.05f, -r * 0.35f), mais(c, r * 1.05f, -r * 0.55f), r * 0.22f, Color{120, 84, 52, 255});
+            DrawLineEx(mais(c, -r * 1.05f, -r * 0.35f), mais(c, r * 1.05f, -r * 0.55f), r * 0.1f, Color{150, 108, 70, 255});
+            Vector2 bagos[] = {{-0.44f, 0.12f}, {0.4f, 0.02f}, {-0.02f, 0.5f}};
+            float raios[] = {0.44f, 0.46f, 0.42f};
+            for (int i = 0; i < 3; i++) DrawCircleV(mais(c, bagos[i].x * r, bagos[i].y * r), raios[i] * r + 2.2f, Color{12, 6, 20, 255});
+            for (int i = 0; i < 3; i++) {
+                Vector2 p = mais(c, bagos[i].x * r, bagos[i].y * r);
+                float rb = raios[i] * r;
+                DrawCircleV(p, rb, Color{44, 22, 58, 255});
+                DrawCircleGradient((int)(p.x - rb * 0.3f), (int)(p.y - rb * 0.3f), rb * 0.7f, Fade(Color{130, 96, 170, 255}, 0.8f), Fade(Color{44, 22, 58, 255}, 0));
+                DrawCircleV(mais(p, -rb * 0.38f, -rb * 0.38f), rb * 0.16f, Fade(WHITE, 0.85f));
+            }
+            break;
+        }
+        case CAJU: {
+            // Caju: a "fruta" amarela e vermelha com a castanha em cima
+            Color vermelho = {226, 58, 44, 255}, amarelo = {252, 204, 44, 255}, escura = {150, 30, 20, 255};
+            DrawCircleV(mais(c, 0, r * 0.28f), r * 0.72f + 2.5f, escura);
+            DrawCircleV(mais(c, 0, -r * 0.2f), r * 0.56f + 2.5f, escura);
+            DrawCircleV(mais(c, 0, r * 0.28f), r * 0.72f, vermelho);
+            DrawCircleGradient((int)c.x, (int)(c.y - r * 0.2f), r * 0.56f, amarelo, vermelho);
+            DrawEllipse((int)(c.x - r * 0.25f), (int)(c.y - r * 0.3f), r * 0.14f, r * 0.08f, Fade(WHITE, 0.7f));
+            // Castanha
+            Color castanha = {150, 132, 100, 255};
+            DrawEllipse((int)(c.x + r * 0.12f), (int)(c.y - r * 0.86f), r * 0.36f + 2, r * 0.2f + 2, Color{96, 82, 58, 255});
+            DrawEllipse((int)(c.x + r * 0.12f), (int)(c.y - r * 0.86f), r * 0.36f, r * 0.2f, castanha);
+            DrawEllipse((int)(c.x + r * 0.2f), (int)(c.y - r * 0.8f), r * 0.14f, r * 0.08f, Color{120, 104, 76, 255});
+            break;
+        }
+        case MANGA: {
+            // Manga inclinada: verde, amarela e vermelha
+            Color escura = {70, 110, 30, 255};
+            const int N = 7;
+            auto ponto = [&](int i) { float t = (float)i / (N - 1); return mais(c, (-0.5f + t) * r * 1.1f, (0.32f - t * 0.64f) * r); };
+            auto raio = [&](int i) { float t = (float)i / (N - 1); return r * (0.5f + 0.2f * sinf(PI * t)); };
+            for (int i = 0; i < N; i++) DrawCircleV(ponto(i), raio(i) + 2.5f, escura);
+            for (int i = 0; i < N; i++) DrawCircleV(ponto(i), raio(i), Color{124, 180, 64, 255});
+            for (int i = 3; i < N; i++) DrawCircleV(mais(ponto(i), r * 0.05f, -r * 0.05f), raio(i) * 0.85f, Fade(Color{246, 126, 44, 255}, 0.75f));
+            DrawCircleGradient((int)(c.x + r * 0.15f), (int)(c.y - r * 0.1f), r * 0.6f, Fade(Color{252, 206, 64, 255}, 0.8f), Fade(Color{252, 206, 64, 255}, 0));
+            DrawLineEx(mais(ponto(N - 1), r * 0.3f, -r * 0.3f), mais(ponto(N - 1), r * 0.5f, -r * 0.55f), max(3.0f, r * 0.1f), COR_CABO);
+            desenharFolha(mais(ponto(N - 1), r * 0.42f, -r * 0.45f), r * 0.55f, r * 0.18f, -150, COR_FOLHA);
+            DrawEllipse((int)(c.x - r * 0.3f), (int)(c.y - r * 0.05f), r * 0.16f, r * 0.08f, Fade(WHITE, 0.6f));
+            break;
+        }
+        case ACAI: {
+            // Acai servido na cuia, do jeito paraense
+            Vector2 borda = mais(c, 0, -r * 0.18f);
+            meioDisco(borda, r * 1.05f + 2.5f, Color{70, 38, 16, 255});
+            meioDisco(borda, r * 1.05f, Color{146, 90, 44, 255});
+            meioDisco(borda, r * 0.8f, Color{170, 110, 58, 255});
+            DrawLineEx(mais(borda, -r * 0.9f, r * 0.35f), mais(borda, r * 0.9f, r * 0.35f), 2.5f, Color{110, 64, 28, 255});
+            DrawEllipse((int)borda.x, (int)borda.y, r * 1.05f + 2, r * 0.3f + 2, Color{70, 38, 16, 255});
+            DrawEllipse((int)borda.x, (int)borda.y, r * 1.02f, r * 0.28f, Color{76, 16, 64, 255});
+            DrawEllipse((int)(borda.x - r * 0.2f), (int)(borda.y - r * 0.05f), r * 0.6f, r * 0.14f, Color{112, 36, 96, 255});
+            Vector2 bagos[] = {{-0.3f, -0.28f}, {0.05f, -0.34f}, {0.35f, -0.26f}, {-0.1f, -0.18f}, {0.2f, -0.14f}};
+            for (Vector2 b : bagos) {
+                Vector2 p = mais(borda, b.x * r, b.y * r);
+                DrawCircleV(p, r * 0.15f, Color{50, 10, 44, 255});
+                DrawCircleV(mais(p, -r * 0.04f, -r * 0.04f), r * 0.05f, Fade(WHITE, 0.6f));
+            }
+            desenharFolha(mais(borda, r * 0.45f, -r * 0.3f), r * 0.55f, r * 0.16f, -60, COR_FOLHA);
+            break;
+        }
+        case CUPUACU: {
+            // Cupuacu: fruta grande, marrom e aveludada
+            Color base = {150, 96, 52, 255}, escura = {82, 50, 22, 255};
+            DrawEllipse((int)c.x, (int)c.y, r * 1.05f + 2.5f, r * 0.8f + 2.5f, escura);
+            DrawEllipse((int)c.x, (int)c.y, r * 1.05f, r * 0.8f, base);
+            DrawEllipse((int)(c.x - r * 0.18f), (int)(c.y - r * 0.18f), r * 0.7f, r * 0.45f, Fade(Color{192, 138, 86, 255}, 0.6f));
+            Vector2 pontos[] = {{-0.6f, 0.2f}, {-0.3f, 0.45f}, {0.1f, 0.5f}, {0.5f, 0.3f}, {0.7f, -0.1f}, {0.35f, -0.4f},
+                                {-0.05f, 0.1f}, {0.3f, 0.05f}, {-0.45f, -0.15f}};
+            for (Vector2 p : pontos) DrawCircleV(mais(c, p.x * r, p.y * r), r * 0.05f, Fade(escura, 0.55f));
+            DrawCircleV(mais(c, -r * 1.02f, 0), r * 0.12f, Color{100, 70, 36, 255});
+            DrawEllipse((int)(c.x - r * 0.4f), (int)(c.y - r * 0.38f), r * 0.18f, r * 0.08f, Fade(WHITE, 0.45f));
+            break;
+        }
+        case BERGAMOTA: {
+            // Bergamota (mexerica): laranja achatada, com gomos marcados e folha escura
+            Color base = {244, 108, 20, 255}, escura = {160, 56, 8, 255};
+            DrawEllipse((int)c.x, (int)(c.y + r * 0.05f), r * 1.02f + 2.5f, r * 0.84f + 2.5f, escura);
+            DrawEllipse((int)c.x, (int)(c.y + r * 0.05f), r * 1.02f, r * 0.84f, base);
+            DrawCircleGradient((int)(c.x - r * 0.25f), (int)(c.y - r * 0.15f), r * 0.7f, Fade(Color{255, 176, 80, 255}, 0.85f), Fade(base, 0));
+            for (float dx : {-0.5f, 0.0f, 0.5f}) {
+                for (float t = -0.6f; t <= 0.6f; t += 0.08f) {
+                    float curva = dx * (1 - t * t * 0.9f);
+                    DrawCircleV(mais(c, curva * r, t * r * 0.8f + r * 0.05f), 1.4f, Fade(escura, 0.45f));
+                }
+            }
+            DrawCircleV(mais(c, 0, -r * 0.76f), r * 0.1f, Color{40, 90, 30, 255});
+            desenharFolha(mais(c, r * 0.02f, -r * 0.78f), r * 0.75f, r * 0.24f, -35, Color{44, 110, 40, 255});
+            DrawEllipse((int)(c.x - r * 0.42f), (int)(c.y - r * 0.3f), r * 0.16f, r * 0.08f, Fade(WHITE, 0.7f));
+            break;
+        }
+        case PESSEGO: {
+            // Pessego: cor de pessego com bochecha rosada e o "risquinho"
+            Color base = {252, 184, 110, 255}, escura = {196, 110, 64, 255};
+            DrawCircleV(c, r + 2.5f, escura);
+            DrawCircleV(c, r, base);
+            DrawCircleGradient((int)(c.x + r * 0.3f), (int)(c.y + r * 0.1f), r * 0.85f, Fade(Color{232, 76, 70, 255}, 0.8f), Fade(Color{232, 76, 70, 255}, 0));
+            for (int a = -80; a <= 60; a += 6) {
+                float ang = a * DEG2RAD;
+                DrawCircleV(mais(c, -r * 0.55f + cosf(ang) * r * 0.55f, sinf(ang) * r * 0.85f), 1.6f, Fade(escura, 0.6f));
+            }
+            DrawLineEx(mais(c, 0, -r * 0.85f), mais(c, r * 0.05f, -r * 1.1f), max(3.0f, r * 0.1f), COR_CABO);
+            desenharFolha(mais(c, r * 0.05f, -r * 0.98f), r * 0.6f, r * 0.2f, -20, COR_FOLHA);
+            DrawCircleV(mais(c, -r * 0.4f, -r * 0.35f), r * 0.18f, Fade(WHITE, 0.4f));
+            break;
+        }
     }
 }
 
@@ -376,8 +500,8 @@ void desenharSeloPronto(Rectangle r, float escala) {
 //  CENARIO: ceu, nuvens, bandeirinhas, toldo, prateleiras, toalha
 // ============================================================
 
-void desenharCeu(float W, float H, float tempo) {
-    DrawRectangleGradientV(0, 0, (int)W, (int)H, Color{138, 204, 242, 255}, Color{255, 238, 206, 255});
+void desenharCeu(float W, float H, float tempo, Color topo = {138, 204, 242, 255}, Color base = {255, 238, 206, 255}) {
+    DrawRectangleGradientV(0, 0, (int)W, (int)H, topo, base);
     // Sol suave
     DrawCircleGradient((int)(W * 0.82f), 150, 150, Fade(Color{255, 240, 170, 255}, 0.8f), Fade(Color{255, 240, 170, 255}, 0));
     // Nuvens andando devagar
@@ -411,8 +535,7 @@ void desenharBandeirinhas(float W, float y, float tempo) {
     }
 }
 
-void desenharToldo(float W) {
-    Color vermelho = {210, 52, 48, 255}, creme = {255, 247, 232, 255};
+void desenharToldo(float W, Color vermelho = {210, 52, 48, 255}, Color creme = {255, 247, 232, 255}) {
     float listra = 64;
     int total = (int)(W / listra) + 2;
     DrawRectangle(0, 0, (int)W, 58, Fade(BLACK, 0.1f));
@@ -424,7 +547,7 @@ void desenharToldo(float W) {
         DrawCircle((int)(x + listra / 2), 48, listra / 2, cor);
         DrawRectangle((int)(x + 8), 8, 6, 36, Fade(WHITE, 0.12f));
     }
-    DrawRectangle(0, 0, (int)W, 8, Color{150, 36, 32, 255});
+    DrawRectangle(0, 0, (int)W, 8, escurecer(vermelho, 0.3f));
 }
 
 // Tabua onde os caixotes ficam apoiados
@@ -703,6 +826,89 @@ void desenharPilulaMoedas(Rectangle r, int moedas) {
     float tamanho = r.height * 0.5f;
     textoCentro(to_string(moedas), r.x + r.height * 0.5f + (r.width - r.height * 0.5f) / 2, r.y + r.height / 2 - tamanho * 0.56f,
                 tamanho, COR_LARANJA);
+}
+
+
+// ============================================================
+//  VIAGEM PELO BRASIL: caminhao do Seu Ze, marcadores e postal
+// ============================================================
+
+// Caminhaozinho de feira carregado de frutas. "direcao" 1 = para a direita
+void desenharCaminhao(Vector2 c, float s, float tempo, float direcao = 1) {
+    float balanco = sinf(tempo * 10) * 1.2f * s;
+    auto X = [&](float dx) { return c.x + dx * s * direcao; };
+    float y = c.y + balanco;
+    // Sombra
+    DrawEllipse((int)c.x, (int)(c.y + 22 * s), 46 * s, 7 * s, Fade(BLACK, 0.25f));
+    // Carroceria com caixotes e frutas
+    Rectangle carroceria = {min(X(-44), X(8)), y - 14 * s, 52 * s, 26 * s};
+    DrawRectangleRounded(carroceria, 0.2f, 6, Color{196, 138, 74, 255});
+    DrawRectangle((int)carroceria.x, (int)(y - 4 * s), (int)carroceria.width, (int)(2 * s), Color{150, 100, 50, 255});
+    desenharFruta(LARANJA, {X(-30), y - 20 * s}, 0.32f * s);
+    desenharFruta(MACA, {X(-14), y - 22 * s}, 0.32f * s);
+    desenharFruta(BANANA, {X(0), y - 18 * s}, 0.3f * s);
+    // Cabine
+    Rectangle cabine = {min(X(10), X(40)), y - 16 * s, 30 * s, 30 * s};
+    DrawRectangleRounded(cabine, 0.35f, 6, Color{214, 60, 52, 255});
+    Rectangle janela = {min(X(18), X(34)), y - 11 * s, 16 * s, 11 * s};
+    DrawRectangleRounded(janela, 0.3f, 6, Color{200, 232, 250, 255});
+    DrawCircleV({X(24), y - 5 * s}, 4 * s, Color{242, 192, 150, 255});  // Seu Ze dirigindo
+    DrawRectangle((int)min(X(19), X(29)), (int)(y - 10 * s), (int)(10 * s), (int)(2.5f * s), Color{236, 196, 116, 255});
+    DrawRectangle((int)min(X(38), X(42)), (int)(y + 4 * s), (int)(4 * s), (int)(4 * s), Color{255, 220, 90, 255});  // farol
+    // Rodas
+    for (float dx : {-30.0f, 24.0f}) {
+        DrawCircleV({X(dx), c.y + 15 * s}, 8 * s, Color{50, 50, 56, 255});
+        DrawCircleV({X(dx), c.y + 15 * s}, 3.5f * s, Color{190, 190, 196, 255});
+    }
+}
+
+// Marcador de cidade no mapa. estado: 0 bloqueada, 1 atual, 2 concluida
+void desenharMarcadorCidade(Vector2 p, int estado, float tempo) {
+    float pulso = estado == 1 ? 1 + 0.12f * sinf(tempo * 5) : 1;
+    float r = 17 * pulso;
+    Color cor = estado == 0 ? Color{160, 152, 142, 255} : (estado == 1 ? COR_LARANJA : COR_VERDE);
+    DrawCircleV(mais(p, 0, 3), r + 3, Fade(BLACK, 0.25f));
+    if (estado == 1) DrawCircleV(p, r + 7, Fade(COR_OURO, 0.7f));
+    DrawCircleV(p, r + 3, WHITE);
+    DrawCircleV(p, r, cor);
+    if (estado == 2) {
+        DrawLineEx(mais(p, -7, 0), mais(p, -2, 6), 3.5f, WHITE);
+        DrawLineEx(mais(p, -2, 6), mais(p, 8, -6), 3.5f, WHITE);
+    } else if (estado == 0) {
+        desenharCadeado(p, 0.55f, Color{240, 236, 230, 255});
+    } else {
+        DrawCircleV(p, r * 0.35f, WHITE);
+    }
+}
+
+// Linha tracejada em curva (a rota da viagem)
+void desenharRota(Vector2 a, Vector2 b, float curvatura, Color cor, float progresso = 1) {
+    Vector2 meio = {(a.x + b.x) / 2 - (b.y - a.y) * curvatura, (a.y + b.y) / 2 + (b.x - a.x) * curvatura};
+    const int PASSOS = 40;
+    for (int i = 0; i < PASSOS; i++) {
+        float t = (float)i / PASSOS;
+        if (t > progresso) break;
+        if (i % 2 == 1) continue;  // tracejado
+        float u = 1 - t;
+        Vector2 p = {u * u * a.x + 2 * u * t * meio.x + t * t * b.x, u * u * a.y + 2 * u * t * meio.y + t * t * b.y};
+        DrawCircleV(p, 3.2f, cor);
+    }
+}
+
+Vector2 pontoNaRota(Vector2 a, Vector2 b, float curvatura, float t) {
+    Vector2 meio = {(a.x + b.x) / 2 - (b.y - a.y) * curvatura, (a.y + b.y) / 2 + (b.x - a.x) * curvatura};
+    float u = 1 - t;
+    return {u * u * a.x + 2 * u * t * meio.x + t * t * b.x, u * u * a.y + 2 * u * t * meio.y + t * t * b.y};
+}
+
+// Envelope (icone do postal)
+void desenharEnvelope(Vector2 c, float s, Color papel, Color linha) {
+    Rectangle r = {c.x - 20 * s, c.y - 14 * s, 40 * s, 28 * s};
+    DrawRectangleRounded({r.x - 2, r.y - 2, r.width + 4, r.height + 4}, 0.15f, 6, linha);
+    DrawRectangleRounded(r, 0.15f, 6, papel);
+    DrawLineEx({r.x + 2, r.y + 2}, {c.x, c.y + 2 * s}, 2.5f * s, linha);
+    DrawLineEx({r.x + r.width - 2, r.y + 2}, {c.x, c.y + 2 * s}, 2.5f * s, linha);
+    DrawCircleV(mais(c, 0, 5 * s), 5 * s, Color{210, 52, 48, 255});  // lacre
 }
 
 // ============================================================
