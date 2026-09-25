@@ -31,10 +31,27 @@
       printErr: function (t) { console.warn(t); }
     };
 
+    // Toques na tela, lidos direto do navegador pelo jogo
+    window.feiraToque = { ativos: 0, contador: 0, x: 0, y: 0 };
+    function registrarToque(e) {
+      var t = window.feiraToque;
+      t.ativos = e.touches.length;
+      var lista = e.touches.length ? e.touches : e.changedTouches;
+      if (lista && lista.length) { t.x = lista[0].clientX; t.y = lista[0].clientY; }
+      if (e.type === 'touchstart') t.contador++;
+    }
+    ['touchstart', 'touchmove', 'touchend', 'touchcancel'].forEach(function (tipo) {
+      window.addEventListener(tipo, registrarToque, { capture: true, passive: true });
+    });
+
     // Os navegadores so liberam o som depois que a pessoa toca na tela.
     // Este codigo "destrava" o audio do jogo a cada toque, clique ou tecla.
+    // No iPhone, faz o som do jogo tocar mesmo com a chave no modo silencioso
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+
     function destravarSom() {
       try {
+        if (navigator.audioSession) navigator.audioSession.type = 'playback';
         if (window.miniaudio && miniaudio.devices) {
           miniaudio.devices.forEach(function (d) {
             if (d && d.webaudio && d.webaudio.state !== 'running') d.webaudio.resume();

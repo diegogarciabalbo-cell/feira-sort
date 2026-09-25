@@ -55,6 +55,12 @@ EM_JS(int, lerNumeroNavegador, (int id, int padrao), {
 EM_JS(void, gravarNumeroNavegador, (int id, int valor), {
     try { localStorage.setItem('feira_sort_' + id, valor); } catch (e) {}
 });
+// Toque na tela lido direto do navegador (a raylib 4.2 conta os dedos errado
+// no celular: depois que o dedo sai, ela acha que ele continua na tela)
+EM_JS(int, toquesAtivos, (), { return window.feiraToque ? window.feiraToque.ativos : 0; });
+EM_JS(int, contadorDeToques, (), { return window.feiraToque ? window.feiraToque.contador : 0; });
+EM_JS(double, toqueX, (), { return window.feiraToque ? window.feiraToque.x : 0; });
+EM_JS(double, toqueY, (), { return window.feiraToque ? window.feiraToque.y : 0; });
 EM_JS(int, dataDeHoje, (), {
     var d = new Date();
     return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
@@ -828,8 +834,13 @@ struct Jogo {
         }
     }
 
-    void atualizarMapa(Vector2 ponteiro, bool pressionado, float W, float H) {
+    void atualizarMapa(Vector2 ponteiro, bool pressionado, bool clicou, float W, float H) {
         rolagemMapa += GetMouseWheelMove() * 90;
+        // Toque rapido no celular: encostou e soltou antes do quadro seguinte
+        if (clicou && !pressionado && !toque.segurando) {
+            tocarNoMapa(ponteiro, W, H);
+            return;
+        }
         if (pressionado && !toque.segurando) {
             toque = {true, false, ponteiro, rolagemMapa};
         }
@@ -1118,21 +1129,36 @@ void quadro() {
     camera.zoom = escala;
 
     // Mouse ou toque na tela (celular)
+#if defined(PLATFORM_WEB)
+    static int contadorAntes = 0;
+    int contador = contadorDeToques();
+    bool toqueNovo = contador != contadorAntes;  // houve um toque desde o ultimo quadro
+    contadorAntes = contador;
+    int toques = toquesAtivos();
+    Vector2 posicaoToque = {(float)(toqueX() * densidade), (float)(toqueY() * densidade)};
+    Vector2 posicao = (toques > 0 || toqueNovo) ? posicaoToque : GetMousePosition();
+#else
     static int toquesAntes = 0;
     int toques = GetTouchPointCount();
     bool toqueNovo = toques > 0 && toquesAntes == 0;
     toquesAntes = toques;
     Vector2 posicao = toques > 0 ? GetTouchPosition(0) : GetMousePosition();
+#endif
     Vector2 mouse = GetScreenToWorld2D(posicao, camera);
-    bool pressionado = IsMouseButtonDown(MOUSE_BUTTON_LEFT) || toques > 0;
+    // Alguns celulares "imitam" um clique de mouse logo depois do toque:
+    // esse clique falso e ignorado para nao contar o mesmo toque duas vezes
+    static double ultimoToque = -10;
+    if (toqueNovo || toques > 0) ultimoToque = GetTime();
+    bool mouseValido = GetTime() - ultimoToque > 0.8;
+    bool pressionado = (mouseValido && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) || toques > 0;
     // No celular nao existe "mouse em cima": depois que o dedo sai, nada fica destacado
     static bool usandoToque = false;
     Vector2 movimento = GetMouseDelta();
-    if (toques > 0) usandoToque = true;
+    if (toques > 0 || toqueNovo) usandoToque = true;
     else if (movimento.x != 0 || movimento.y != 0) usandoToque = false;
     Vector2 ponteiro = mouse;  // posicao real, usada no arraste do mapa
-    if (usandoToque && toques == 0) mouse = {-9999, -9999};
-    bool clicou = IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || toqueNovo;
+    if (usandoToque && toques == 0 && !toqueNovo) mouse = {-9999, -9999};
+    bool clicou = (mouseValido && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) || toqueNovo;
 
     jogo.sons.atualizarMusica();
     atualizarParticulas(dt);
@@ -1152,7 +1178,7 @@ void quadro() {
     } else if (jogo.tela == MENU) {
         jogo.atualizarMenu(mouse, clicou, H);
     } else if (jogo.tela == MAPA) {
-        jogo.atualizarMapa(ponteiro, pressionado, W, H);
+        jogo.atualizarMapa(ponteiro, pressionado, clicou, W, H);
     } else {
         jogo.atualizarJogo(dt, mouse, clicou, L);
     }
