@@ -161,20 +161,27 @@ bool resolver(Feira feira, vector<Jogada>& caminho, bool& estourouLimite) {
 //  FASES
 // ============================================================
 
-// Fase 1: 3 frutas, 2: 4, 3-4: 5, 5-7: 6, 8 em diante: 7
+// Quantas frutas diferentes cada fase tem
 int frutasDaFase(int fase) {
-    if (fase <= 1) return 3;
-    if (fase == 2) return 4;
-    if (fase <= 4) return 5;
-    if (fase <= 7) return 6;
+    if (fase <= 2) return 3;
+    if (fase <= 4) return 4;
+    if (fase <= 6) return 5;
+    if (fase <= 9) return 6;
     return 7;
 }
 
-Feira criarFeira(int fase, mt19937& gerador) {
-    int qtdFrutas = frutasDaFase(fase);
+// A partir da fase 6 aparecem frutas escondidas no saquinho (estilo Magic Sort)
+const int PRIMEIRA_FASE_ESCONDIDA = 6;
 
+float chanceEscondida(int fase) {
+    if (fase < PRIMEIRA_FASE_ESCONDIDA) return 0;
+    return min(0.55f, 0.15f + 0.05f * (fase - PRIMEIRA_FASE_ESCONDIDA));
+}
+
+// Monta uma feira com "qtdFrutas" tipos, sempre com solucao
+Feira criarFeira(int qtdFrutas, mt19937& gerador) {
     while (true) {
-        // Sorteia quais frutas entram nesta fase
+        // Sorteia quais frutas entram
         vector<int> tipos;
         for (int f = 0; f < TOTAL_FRUTAS; f++) tipos.push_back(f);
         shuffle(tipos.begin(), tipos.end(), gerador);
@@ -203,5 +210,54 @@ Feira criarFeira(int fase, mt19937& gerador) {
         vector<Jogada> caminho;
         bool estourou;
         if (resolver(feira, caminho, estourou)) return feira;
+    }
+}
+
+// ------------------------------------------------------------
+//  Um nivel completo: as frutas e quais estao escondidas.
+//  Tudo sai da "semente": a mesma semente gera sempre o mesmo
+//  nivel. Assim a fase 12 e igual para todo mundo, como no
+//  Candy Crush, e da para jogar de novo buscando 3 estrelas.
+// ------------------------------------------------------------
+
+using Escondidas = vector<vector<bool>>;  // [caixote][posicao]
+
+struct Nivel {
+    Feira feira;
+    Escondidas escondidas;
+};
+
+Nivel gerarNivel(int qtdFrutas, float chanceDeEsconder, unsigned semente) {
+    mt19937 gerador(semente);
+    Nivel n;
+    n.feira = criarFeira(qtdFrutas, gerador);
+    n.escondidas.assign(n.feira.size(), vector<bool>(CAPACIDADE, false));
+    uniform_real_distribution<float> sorteio(0, 1);
+    for (int c = 0; c < qtdFrutas; c++) {
+        for (int k = 0; k < CAPACIDADE - 1; k++) {  // a fruta de cima nunca comeca escondida
+            if (sorteio(gerador) < chanceDeEsconder) n.escondidas[c][k] = true;
+        }
+    }
+    return n;
+}
+
+Nivel nivelDaFase(int fase) {
+    return gerarNivel(frutasDaFase(fase), chanceEscondida(fase), (unsigned)fase * 2654435761u + 12345u);
+}
+
+// Desafio do dia: a data (ex.: 20260925) vira a semente
+Nivel nivelDoDesafio(int data) {
+    return gerarNivel(6, 0.3f, (unsigned)data * 7919u + 777u);
+}
+
+// Revela o grupo de frutas de cima de cada caixote
+void revelarTopos(const Feira& feira, Escondidas& escondidas) {
+    escondidas.resize(feira.size(), vector<bool>(CAPACIDADE, false));
+    for (size_t c = 0; c < feira.size(); c++) {
+        int tamanho = feira[c].size();
+        int grupo = feira[c].empty() ? 0 : frutasIguaisNoTopo(feira[c]);
+        for (int k = 0; k < CAPACIDADE; k++) {
+            if (k >= tamanho || k >= tamanho - grupo) escondidas[c][k] = false;
+        }
     }
 }

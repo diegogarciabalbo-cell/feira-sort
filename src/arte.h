@@ -284,6 +284,46 @@ void desenharFruta(int fruta, Vector2 c, float escala = 1.0f) {
     }
 }
 
+// Fruta escondida: saquinho de papel com "?" (estilo Magic Sort)
+void desenharSaquinho(Vector2 c, float escala = 1.0f) {
+    float r = RAIO_FRUTA * escala;
+    DrawEllipse((int)c.x, (int)(c.y + r * 0.95f), r * 0.78f, r * 0.14f, Fade(BLACK, 0.22f));
+    Rectangle saco = {c.x - r * 0.78f, c.y - r * 0.78f, r * 1.56f, r * 1.7f};
+    DrawRectangleRounded({saco.x - 2.5f, saco.y - 2.5f, saco.width + 5, saco.height + 5}, 0.3f, 8, Color{140, 98, 52, 255});
+    DrawRectangleRounded(saco, 0.3f, 8, Color{224, 186, 128, 255});
+    // Dobra de cima em zigue-zague
+    DrawRectangle((int)saco.x, (int)saco.y + 2, (int)saco.width, (int)(r * 0.3f), Color{198, 156, 96, 255});
+    int dentes = 5;
+    float largura = saco.width / dentes;
+    for (int i = 0; i < dentes; i++) {
+        float x = saco.x + i * largura;
+        triangulo({x, saco.y + r * 0.3f + 2}, {x + largura, saco.y + r * 0.3f + 2}, {x + largura / 2, saco.y + r * 0.46f + 2},
+                  Color{198, 156, 96, 255});
+    }
+    DrawRectangle((int)(saco.x + r * 0.2f), (int)(saco.y + r * 0.6f), (int)(r * 0.14f), (int)(r * 0.85f), Fade(WHITE, 0.25f));
+    textoCentro("?", c.x + 1, c.y - r * 0.42f + 2, r * 1.15f, Fade(Color{90, 55, 25, 255}, 0.35f));
+    textoCentro("?", c.x, c.y - r * 0.42f, r * 1.15f, Color{120, 76, 36, 255});
+}
+
+void desenharMoeda(Vector2 c, float r) {
+    DrawCircleV(mais(c, 1, 2), r, Fade(BLACK, 0.2f));
+    DrawCircleV(c, r, Color{200, 136, 18, 255});
+    DrawCircleV(c, r * 0.84f, Color{255, 204, 52, 255});
+    DrawCircleV(c, r * 0.64f, Color{242, 172, 30, 255});
+    desenharEstrela(c, r * 0.46f, Color{255, 226, 110, 255});
+    DrawCircleV(mais(c, -r * 0.4f, -r * 0.4f), r * 0.16f, Fade(WHITE, 0.7f));
+}
+
+void desenharCadeado(Vector2 c, float s, Color cor) {
+    for (int a = 180; a <= 360; a += 10) {
+        float ang = a * DEG2RAD;
+        DrawCircleV({c.x + cosf(ang) * 8 * s, c.y - 5 * s + sinf(ang) * 9 * s}, 2.6f * s, cor);
+    }
+    DrawRectangleRounded({c.x - 12 * s, c.y - 5 * s, 24 * s, 19 * s}, 0.3f, 6, cor);
+    DrawCircleV(mais(c, 0, 3 * s), 2.8f * s, Fade(BLACK, 0.35f));
+    DrawRectangle((int)(c.x - 1.2f * s), (int)(c.y + 3 * s), (int)(2.4f * s), (int)(6 * s), Fade(BLACK, 0.35f));
+}
+
 // ============================================================
 //  CAIXOTE DE MADEIRA
 // ============================================================
@@ -505,7 +545,7 @@ void desenharBalao(Rectangle r, const string& fala, Vector2 ponta, float tamanho
 //  BOTOES com icones
 // ============================================================
 
-enum Icone { SEM_ICONE, ICONE_DESFAZER, ICONE_DICA, ICONE_REINICIAR, ICONE_NOVA, ICONE_CASA, ICONE_SOM, ICONE_MUDO, ICONE_JOGAR, ICONE_AJUDA };
+enum Icone { SEM_ICONE, ICONE_DESFAZER, ICONE_DICA, ICONE_REINICIAR, ICONE_NOVA, ICONE_CASA, ICONE_SOM, ICONE_MUDO, ICONE_JOGAR, ICONE_AJUDA, ICONE_CAIXOTE, ICONE_CALENDARIO, ICONE_MAPA };
 
 // Seta em arco (usada em desfazer e reiniciar)
 void setaCurva(Vector2 c, float raio, float inicioGraus, float fimGraus, float espessura, Color cor) {
@@ -562,6 +602,28 @@ void desenharIcone(Icone icone, Vector2 c, float s, Color cor) {
             break;
         case ICONE_AJUDA:
             DrawCircleV(c, 13 * s, cor);
+            break;
+        case ICONE_CAIXOTE:
+            // Caixote de ripas com um "+" (caixote extra)
+            DrawRectangleLinesEx({c.x - 14 * s, c.y - 8 * s, 22 * s, 20 * s}, 3 * s, cor);
+            DrawRectangle((int)(c.x - 13 * s), (int)(c.y + 0.5f * s), (int)(20 * s), (int)(3 * s), cor);
+            DrawCircleV(mais(c, 10 * s, -9 * s), 7.5f * s, cor);
+            DrawRectangle((int)(c.x + 6 * s), (int)(c.y - 10 * s), (int)(8 * s), (int)(2.5f * s), Fade(BLACK, 0.45f));
+            DrawRectangle((int)(c.x + 8.75f * s), (int)(c.y - 13 * s), (int)(2.5f * s), (int)(8 * s), Fade(BLACK, 0.45f));
+            break;
+        case ICONE_CALENDARIO:
+            DrawRectangleRounded({c.x - 13 * s, c.y - 10 * s, 26 * s, 24 * s}, 0.25f, 6, cor);
+            DrawRectangle((int)(c.x - 13 * s), (int)(c.y - 4 * s), (int)(26 * s), (int)(2 * s), Fade(BLACK, 0.35f));
+            DrawRectangle((int)(c.x - 8 * s), (int)(c.y - 14 * s), (int)(3 * s), (int)(7 * s), cor);
+            DrawRectangle((int)(c.x + 5 * s), (int)(c.y - 14 * s), (int)(3 * s), (int)(7 * s), cor);
+            for (int i = 0; i < 3; i++) {
+                DrawRectangle((int)(c.x - 9 * s + i * 7 * s), (int)(c.y + 2 * s), (int)(4 * s), (int)(4 * s), Fade(BLACK, 0.3f));
+            }
+            break;
+        case ICONE_MAPA:
+            DrawCircleV(mais(c, 0, -5 * s), 10 * s, cor);
+            triangulo(mais(c, -9 * s, -1 * s), mais(c, 9 * s, -1 * s), mais(c, 0, 14 * s), cor);
+            DrawCircleV(mais(c, 0, -5 * s), 4 * s, Fade(BLACK, 0.3f));
             break;
         default:
             break;
@@ -629,6 +691,18 @@ void desenharPilula(Rectangle r, const string& titulo, const string& valor) {
     float y = r.y + r.height / 2 - tamanho * 0.56f;
     texto(titulo + " ", x, y, tamanho, Fade(COR_TEXTO, 0.7f));
     texto(valor, x + larguraTexto(titulo + " ", tamanho), y, tamanho, COR_LARANJA);
+}
+
+// Etiqueta com moeda e quantidade
+void desenharPilulaMoedas(Rectangle r, int moedas) {
+    DrawRectangleRounded({r.x + 2, r.y + 5, r.width, r.height}, 0.5f, 10, Fade(BLACK, 0.15f));
+    DrawRectangleRounded(r, 0.5f, 10, COR_CREME);
+    DrawRectangleRounded({r.x + 4, r.y + 4, r.width - 8, r.height - 8}, 0.5f, 10, Color{255, 252, 244, 255});
+    float raio = r.height * 0.32f;
+    desenharMoeda({r.x + r.height * 0.55f, r.y + r.height / 2}, raio);
+    float tamanho = r.height * 0.5f;
+    textoCentro(to_string(moedas), r.x + r.height * 0.5f + (r.width - r.height * 0.5f) / 2, r.y + r.height / 2 - tamanho * 0.56f,
+                tamanho, COR_LARANJA);
 }
 
 // ============================================================

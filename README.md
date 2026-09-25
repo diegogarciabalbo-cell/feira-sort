@@ -21,21 +21,31 @@ Jogos de "sort" como Magic Sort e Bus Fever Party são sucesso mundial, mas os j
 | Travei e não percebi | O jogo **avisa na hora** e destaca o botão DESFAZER |
 | Dica que não ajuda | A dica segue um **plano completo**: seguindo as dicas, você sempre termina |
 
-![Jogando](imagens/jogo.png)
+![Mapa de fases](imagens/mapa.png)
+
+![Frutas escondidas](imagens/escondidas.png)
 
 ## Recursos
 
-- Tela inicial, tutorial "Como jogar" e fases com dificuldade crescente (3 a 7 frutas)
-- Estrelas no fim da fase (3 estrelas sem usar dicas)
+Inspirados nos sucessos **Candy Crush** e **Magic Sort**, adaptados para o público 50+:
+
+- 🗺️ **Mapa de fases** com caminho, estrelas conquistadas e o Seu Zé marcando onde você está
+- ❓ **Frutas escondidas no saquinho** (a partir da fase 6): elas aparecem quando chegam ao topo
+- 🪙 **Moedas** ganhas ao passar de fase
+- 📦 **Caixote extra**: um reforço comprado com moedas quando a banca aperta
+- 📅 **Desafio do dia**: uma fase especial por dia, que vale 100 moedas e cria o hábito de voltar
+- Fases fixas: a fase 12 é igual para todo mundo e pode ser jogada de novo em busca de 3 estrelas
+- Estrelas: 3 sem ajuda, 2 com até 2 dicas ou caixote extra, 1 com mais ajuda
+- Tela inicial, tutorial "Como jogar" e dificuldade crescente (3 a 7 frutas)
 - Confete, animações suaves e frutas que "pulam" ao cair no caixote
 - Música de feira e efeitos sonoros **gerados pelo próprio código**, com botão para desligar
 - Progresso salvo automaticamente
 - Tela que se adapta: **deitada** (computador) ou **em pé** (celular)
 - Toda arte é desenhada por código, sem nenhuma imagem
 
-| Vitória | Celular |
-|---|---|
-| ![Vitória](imagens/vitoria.png) | ![Celular](imagens/celular.png) |
+| Vitória | Mapa no celular | Desafio no celular |
+|---|---|---|
+| ![Vitória](imagens/vitoria.png) | ![Mapa no celular](imagens/mapa-celular.png) | ![Desafio](imagens/celular.png) |
 
 ## Como rodar (Linux)
 
@@ -84,6 +94,8 @@ No navegador, o progresso fica salvo no `localStorage`, a tela acompanha o taman
   - dar dicas e detectar quando o jogador travou
 - **Ordenação heurística das jogadas** (empilhar frutas iguais primeiro, usar caixote vazio por último): reduziu a solução média das fases difíceis de cerca de 30 para 23 jogadas
 - **Plano de dica em cache**: evita que dicas seguidas fiquem andando em círculos (bug encontrado por teste automatizado)
+- **Níveis gerados por semente**: cada fase sai de um gerador aleatório com semente fixa, então é sempre a mesma; o desafio do dia usa a data como semente
+- Progresso salvo em arquivo (computador) ou no `localStorage` (navegador), com migração do save da versão anterior
 - Tela virtual com câmera 2D: o mesmo layout funciona em qualquer resolução
 - Síntese de som: ondas senoidais com harmônicos e envelope de ataque e decaimento
 
