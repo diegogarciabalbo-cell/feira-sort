@@ -28,7 +28,7 @@ if [ -d fotos ]; then FOTOS="--preload-file fotos"; fi
 
 emcc src/main.cpp -o docs/index.html -std=c++17 -Os -DPLATFORM_WEB \
     -I "$RAYLIB" "$RAYLIB_WEB/libraylib.a" \
-    -sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=67108864 \
+    -sUSE_GLFW=3 -sEXPORTED_RUNTIME_METHODS=ccall -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=67108864 \
     --preload-file Poppins-Bold.ttf $FOTOS --shell-file web/shell.html
 
 echo ""
