@@ -12,7 +12,9 @@
 
 using namespace std;
 
-const int CAPACIDADE = 4;       // frutas por caixote
+// Frutas por caixote. Muda de fase para fase (3 = rapidinha, 4 = normal, 5 = banca grande),
+// por isso nao e constante: comecarNivel ajusta antes de jogar.
+int CAPACIDADE = 4;
 const int CAIXOTES_VAZIOS = 2;  // caixotes vazios para manobrar
 const int LIMITE_BUSCA = 200000;
 
@@ -24,6 +26,12 @@ enum Fruta {
     CAJU, MANGA,         // Caruaru
     ACAI, CUPUACU,       // Belem
     BERGAMOTA, PESSEGO,  // Porto Alegre
+    // Frutas do mundo
+    PERA, CEREJA,              // Porto (Portugal)
+    ROMA, AZEITONA,            // Barcelona (Espanha)
+    FIGO, LIMAO_SICILIANO,     // Florenca (Italia)
+    TAMARA, DAMASCO,           // Beirute (Libano)
+    CAQUI, NASHI,              // Toquio (Japao)
     TOTAL_FRUTAS
 };
 
@@ -222,12 +230,15 @@ using Escondidas = vector<vector<bool>>;  // [caixote][posicao]
 struct Nivel {
     Feira feira;
     Escondidas escondidas;
+    int capacidade = 4;
 };
 
 Nivel gerarNivel(const vector<int>& obrigatorias, const vector<int>& opcionais, int qtdFrutas, float chanceDeEsconder,
-                 unsigned semente) {
+                 unsigned semente, int capacidade = 4) {
+    CAPACIDADE = capacidade;  // o gerador e o resolvedor usam a altura desta fase
     mt19937 gerador(semente);
     Nivel n;
+    n.capacidade = capacidade;
     n.feira = criarFeira(obrigatorias, opcionais, qtdFrutas, gerador);
     n.escondidas.assign(n.feira.size(), vector<bool>(CAPACIDADE, false));
     uniform_real_distribution<float> sorteio(0, 1);

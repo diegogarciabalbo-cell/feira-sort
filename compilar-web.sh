@@ -22,10 +22,14 @@ fi
 # 2) Compila o jogo
 echo "Compilando o Feira Sort para web..."
 mkdir -p docs
+# As fotos dos mercados entram no pacote so se a pasta existir
+FOTOS=""
+if [ -d fotos ]; then FOTOS="--preload-file fotos"; fi
+
 emcc src/main.cpp -o docs/index.html -std=c++17 -Os -DPLATFORM_WEB \
     -I "$RAYLIB" "$RAYLIB_WEB/libraylib.a" \
     -sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=67108864 \
-    --preload-file Poppins-Bold.ttf --shell-file web/shell.html
+    --preload-file Poppins-Bold.ttf $FOTOS --shell-file web/shell.html
 
 echo ""
 echo "Pronto! Arquivos gerados em docs/"

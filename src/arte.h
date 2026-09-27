@@ -17,8 +17,17 @@ using namespace std;
 
 // ---------------- Medidas (em pixels da tela virtual) ----------------
 const float CAIXOTE_LARGURA = 112;
-const float VAGA_ALTURA = 80;
-const float CAIXOTE_ALTURA = 4 * VAGA_ALTURA + 28;
+// A altura de cada vaga muda com a capacidade da fase: com 5 frutas as vagas encolhem
+// um pouco para o caixote caber na tela (e as frutas sao desenhadas menores).
+float VAGA_ALTURA = 80;
+float CAIXOTE_ALTURA = 4 * VAGA_ALTURA + 28;
+float ESCALA_FRUTA = 1;
+
+void ajustarVagas(int capacidade) {
+    VAGA_ALTURA = capacidade >= 5 ? 66 : 80;
+    CAIXOTE_ALTURA = capacidade * VAGA_ALTURA + 28;
+    ESCALA_FRUTA = VAGA_ALTURA / 80;
+}
 const float RAIO_FRUTA = 33;
 const float ALTURA_LEVANTADA = 58;
 
@@ -405,6 +414,150 @@ void desenharFruta(int fruta, Vector2 c, float escala = 1.0f) {
             DrawCircleV(mais(c, -r * 0.4f, -r * 0.35f), r * 0.18f, Fade(WHITE, 0.4f));
             break;
         }
+        case PERA: {
+            // Pera-rocha: amarelo-esverdeada, com pintinhas
+            Color base = {206, 204, 92, 255}, escura = {120, 118, 40, 255};
+            DrawCircleV(mais(c, 0, r * 0.3f), r * 0.7f + 2.5f, escura);
+            DrawCircleV(mais(c, 0, -r * 0.3f), r * 0.44f + 2.5f, escura);
+            DrawCircleV(mais(c, 0, r * 0.3f), r * 0.7f, base);
+            DrawCircleV(mais(c, 0, -r * 0.3f), r * 0.44f, base);
+            DrawCircleV(mais(c, 0, -r * 0.02f), r * 0.52f, base);
+            DrawCircleGradient((int)(c.x - r * 0.2f), (int)(c.y + r * 0.1f), r * 0.55f, Fade(Color{244, 238, 150, 255}, 0.8f), Fade(base, 0));
+            Vector2 pintas[] = {{0.3f, 0.4f}, {-0.3f, 0.55f}, {0.1f, 0.7f}, {0.4f, 0.05f}, {-0.1f, -0.35f}};
+            for (Vector2 q : pintas) DrawCircleV(mais(c, q.x * r, q.y * r), 1.6f, Fade(Color{150, 120, 50, 255}, 0.7f));
+            DrawLineEx(mais(c, 0, -r * 0.7f), mais(c, r * 0.12f, -r * 1.1f), max(3.0f, r * 0.1f), COR_CABO);
+            desenharFolha(mais(c, r * 0.08f, -r * 0.95f), r * 0.5f, r * 0.17f, -25, COR_FOLHA);
+            brilho(mais(c, 0, r * 0.25f), r * 0.8f);
+            break;
+        }
+        case CEREJA: {
+            // Duas cerejas presas pelo cabinho
+            Vector2 topo = mais(c, r * 0.1f, -r * 1.0f);
+            Vector2 bolas[] = {mais(c, -r * 0.42f, r * 0.3f), mais(c, r * 0.42f, r * 0.4f)};
+            for (Vector2 b : bolas) DrawLineEx(topo, mais(b, 0, -r * 0.38f), max(2.5f, r * 0.08f), Color{96, 120, 40, 255});
+            desenharFolha(topo, r * 0.55f, r * 0.18f, -20, COR_FOLHA);
+            for (Vector2 b : bolas) DrawCircleV(b, r * 0.45f + 2.2f, Color{100, 10, 24, 255});
+            for (Vector2 b : bolas) {
+                DrawCircleV(b, r * 0.45f, Color{196, 20, 44, 255});
+                DrawCircleGradient((int)(b.x - r * 0.12f), (int)(b.y - r * 0.12f), r * 0.32f, Fade(Color{250, 110, 120, 255}, 0.8f), Fade(Color{196, 20, 44, 255}, 0));
+                DrawCircleV(mais(b, -r * 0.18f, -r * 0.18f), r * 0.08f, Fade(WHITE, 0.85f));
+            }
+            break;
+        }
+        case ROMA: {
+            // Roma: vermelha, redonda, com a "coroa" em cima
+            Color base = {196, 36, 50, 255}, escura = {110, 14, 26, 255};
+            DrawRectangle((int)(c.x - r * 0.26f), (int)(c.y - r * 1.02f), (int)(r * 0.52f), (int)(r * 0.3f), escura);
+            for (float dx : {-0.3f, 0.0f, 0.3f}) {
+                triangulo(mais(c, dx * r - r * 0.14f, -r * 0.95f), mais(c, dx * r + r * 0.14f, -r * 0.95f), mais(c, dx * r, -r * 1.3f), escura);
+                triangulo(mais(c, dx * r - r * 0.09f, -r * 0.97f), mais(c, dx * r + r * 0.09f, -r * 0.97f), mais(c, dx * r, -r * 1.22f), Color{176, 48, 52, 255});
+            }
+            DrawCircleV(c, r * 0.92f + 2.5f, escura);
+            DrawCircleV(c, r * 0.92f, base);
+            DrawCircleGradient((int)(c.x - r * 0.25f), (int)(c.y - r * 0.2f), r * 0.65f, Fade(Color{240, 110, 100, 255}, 0.8f), Fade(base, 0));
+            DrawEllipse((int)(c.x + r * 0.35f), (int)(c.y + r * 0.35f), r * 0.2f, r * 0.12f, Fade(Color{250, 200, 150, 255}, 0.35f));
+            brilho(c, r * 0.9f);
+            break;
+        }
+        case AZEITONA: {
+            // Azeitonas verdes num raminho de oliveira
+            DrawLineEx(mais(c, -r * 0.9f, -r * 0.7f), mais(c, r * 0.8f, r * 0.2f), r * 0.1f, Color{110, 90, 60, 255});
+            desenharFolha(mais(c, -r * 0.5f, -r * 0.5f), r * 0.7f, r * 0.14f, -160, Color{110, 140, 100, 255});
+            desenharFolha(mais(c, r * 0.2f, -r * 0.1f), r * 0.7f, r * 0.14f, -40, Color{110, 140, 100, 255});
+            Vector2 olivas[] = {{-0.35f, 0.05f}, {0.2f, 0.35f}, {-0.1f, 0.55f}};
+            for (Vector2 o : olivas) DrawEllipse((int)(c.x + o.x * r), (int)(c.y + o.y * r), r * 0.34f + 2, r * 0.26f + 2, Color{70, 90, 20, 255});
+            for (Vector2 o : olivas) {
+                Vector2 p = mais(c, o.x * r, o.y * r);
+                DrawEllipse((int)p.x, (int)p.y, r * 0.34f, r * 0.26f, Color{138, 160, 50, 255});
+                DrawEllipse((int)(p.x - r * 0.1f), (int)(p.y - r * 0.08f), r * 0.12f, r * 0.06f, Fade(WHITE, 0.6f));
+            }
+            break;
+        }
+        case FIGO: {
+            // Figo: gota roxa com cabinho
+            Color base = {110, 50, 96, 255}, escura = {56, 20, 46, 255};
+            DrawCircleV(mais(c, 0, r * 0.25f), r * 0.72f + 2.5f, escura);
+            triangulo(mais(c, -r * 0.6f, r * 0.05f), mais(c, r * 0.6f, r * 0.05f), mais(c, 0, -r * 0.95f), escura);
+            DrawCircleV(mais(c, 0, r * 0.25f), r * 0.72f, base);
+            triangulo(mais(c, -r * 0.55f, r * 0.08f), mais(c, r * 0.55f, r * 0.08f), mais(c, 0, -r * 0.88f), base);
+            DrawCircleGradient((int)(c.x - r * 0.2f), (int)(c.y + r * 0.05f), r * 0.55f, Fade(Color{170, 110, 160, 255}, 0.8f), Fade(base, 0));
+            for (float dx : {-0.3f, 0.0f, 0.3f}) DrawLineEx(mais(c, dx * r * 0.5f, -r * 0.6f), mais(c, dx * r, r * 0.8f), 1.5f, Fade(escura, 0.4f));
+            DrawLineEx(mais(c, 0, -r * 0.85f), mais(c, r * 0.1f, -r * 1.1f), max(3.0f, r * 0.12f), Color{100, 110, 40, 255});
+            brilho(mais(c, 0, r * 0.2f), r * 0.8f);
+            break;
+        }
+        case LIMAO_SICILIANO: {
+            // Limao-siciliano: amarelo, oval, com pontinhas
+            Color base = {250, 220, 50, 255}, escura = {180, 140, 10, 255};
+            DrawEllipse((int)c.x, (int)c.y, r * 0.95f + 2.5f, r * 0.72f + 2.5f, escura);
+            triangulo(mais(c, -r * 0.9f, -r * 0.2f), mais(c, -r * 0.9f, r * 0.2f), mais(c, -r * 1.2f, 0), escura);
+            triangulo(mais(c, r * 0.9f, -r * 0.2f), mais(c, r * 0.9f, r * 0.2f), mais(c, r * 1.2f, 0), escura);
+            DrawEllipse((int)c.x, (int)c.y, r * 0.95f, r * 0.72f, base);
+            triangulo(mais(c, -r * 0.88f, -r * 0.16f), mais(c, -r * 0.88f, r * 0.16f), mais(c, -r * 1.14f, 0), base);
+            triangulo(mais(c, r * 0.88f, -r * 0.16f), mais(c, r * 0.88f, r * 0.16f), mais(c, r * 1.14f, 0), base);
+            DrawEllipse((int)(c.x - r * 0.2f), (int)(c.y - r * 0.2f), r * 0.55f, r * 0.3f, Fade(Color{255, 244, 150, 255}, 0.6f));
+            DrawEllipse((int)(c.x - r * 0.35f), (int)(c.y - r * 0.32f), r * 0.2f, r * 0.08f, Fade(WHITE, 0.8f));
+            break;
+        }
+        case TAMARA: {
+            // Tamaras: tres frutinhas marrons compridas num cacho
+            DrawLineEx(mais(c, 0, -r * 1.05f), mais(c, 0, -r * 0.3f), r * 0.1f, Color{200, 150, 60, 255});
+            float angulos[] = {-0.5f, 0.0f, 0.5f};
+            for (int camada = 0; camada < 2; camada++) {
+                for (float a : angulos) {
+                    Vector2 p = mais(c, a * r * 0.95f, r * 0.2f + fabsf(a) * r * 0.15f);
+                    float w = r * 0.26f, h = r * 0.55f;
+                    if (camada == 0) DrawEllipse((int)p.x, (int)p.y, w + 2, h + 2, Color{60, 26, 10, 255});
+                    else {
+                        DrawEllipse((int)p.x, (int)p.y, w, h, Color{140, 70, 30, 255});
+                        DrawEllipse((int)(p.x - w * 0.3f), (int)(p.y - h * 0.3f), w * 0.3f, h * 0.35f, Fade(Color{220, 150, 90, 255}, 0.6f));
+                        DrawLineEx(mais(p, 0, -h), mais(c, 0, -r * 0.3f), 2, Color{200, 150, 60, 255});
+                    }
+                }
+            }
+            break;
+        }
+        case DAMASCO: {
+            // Damasco: pequeno, laranja-dourado, com pintinhas
+            Color base = {246, 160, 40, 255}, escura = {180, 96, 20, 255};
+            DrawCircleV(c, r * 0.82f + 2.5f, escura);
+            DrawCircleV(c, r * 0.82f, base);
+            DrawCircleGradient((int)(c.x + r * 0.25f), (int)(c.y + r * 0.1f), r * 0.6f, Fade(Color{236, 100, 40, 255}, 0.6f), Fade(Color{236, 100, 40, 255}, 0));
+            for (int a = -70; a <= 70; a += 8) {
+                float ang = a * DEG2RAD;
+                DrawCircleV(mais(c, cosf(ang) * r * 0.1f - r * 0.05f, sinf(ang) * r * 0.7f), 1.4f, Fade(escura, 0.6f));
+            }
+            Vector2 pintas[] = {{0.4f, -0.3f}, {0.3f, 0.4f}, {-0.45f, 0.3f}};
+            for (Vector2 q : pintas) DrawCircleV(mais(c, q.x * r, q.y * r), 1.6f, Fade(Color{190, 80, 30, 255}, 0.7f));
+            desenharFolha(mais(c, 0, -r * 0.8f), r * 0.5f, r * 0.17f, -30, COR_FOLHA);
+            brilho(c, r * 0.8f);
+            break;
+        }
+        case CAQUI: {
+            // Caqui: laranja, achatado, com as 4 folhinhas em cima
+            Color base = {246, 118, 24, 255}, escura = {170, 60, 10, 255};
+            DrawEllipse((int)c.x, (int)(c.y + r * 0.1f), r * 0.98f + 2.5f, r * 0.8f + 2.5f, escura);
+            DrawEllipse((int)c.x, (int)(c.y + r * 0.1f), r * 0.98f, r * 0.8f, base);
+            DrawCircleGradient((int)(c.x - r * 0.25f), (int)(c.y), r * 0.6f, Fade(Color{255, 170, 70, 255}, 0.8f), Fade(base, 0));
+            for (float a : {-170.0f, -110.0f, -70.0f, -10.0f}) desenharFolha(mais(c, 0, -r * 0.62f), r * 0.42f, r * 0.2f, a, Color{80, 110, 40, 255});
+            DrawCircleV(mais(c, 0, -r * 0.64f), r * 0.14f, Color{90, 70, 30, 255});
+            DrawEllipse((int)(c.x - r * 0.4f), (int)(c.y - r * 0.15f), r * 0.16f, r * 0.08f, Fade(WHITE, 0.75f));
+            break;
+        }
+        case NASHI: {
+            // Nashi (pera japonesa): redonda, bege-dourada, com pintinhas claras
+            Color base = {222, 186, 110, 255}, escura = {140, 104, 50, 255};
+            DrawCircleV(c, r * 0.95f + 2.5f, escura);
+            DrawCircleV(c, r * 0.95f, base);
+            DrawCircleGradient((int)(c.x - r * 0.25f), (int)(c.y - r * 0.25f), r * 0.7f, Fade(Color{246, 222, 160, 255}, 0.85f), Fade(base, 0));
+            for (int i = 0; i < 14; i++) {
+                float a = i * 2.4f, d = 0.25f + 0.05f * (i % 5) * 2.2f;
+                DrawCircleV(mais(c, cosf(a) * r * d, sinf(a) * r * d), 1.5f, Fade(Color{250, 240, 210, 255}, 0.8f));
+            }
+            DrawLineEx(mais(c, 0, -r * 0.85f), mais(c, r * 0.05f, -r * 1.15f), max(3.0f, r * 0.1f), COR_CABO);
+            brilho(c, r * 0.9f);
+            break;
+        }
     }
 }
 
@@ -465,7 +618,8 @@ void desenharCaixote(Rectangle r, int destaque, bool pronto) {
 
     // Fundo e ripas de tras
     DrawRectangleGradientV((int)r.x, (int)r.y, (int)r.width, (int)r.height, Color{92, 56, 28, 255}, Color{64, 38, 18, 255});
-    for (int k = 0; k < 4; k++) {
+    int ripas = (int)((r.height - 28) / VAGA_ALTURA + 0.5f);
+    for (int k = 0; k < ripas; k++) {
         float y = r.y + 14 + k * VAGA_ALTURA + VAGA_ALTURA * 0.28f;
         DrawRectangleGradientV((int)r.x, (int)y, (int)r.width, (int)(VAGA_ALTURA * 0.44f), Color{156, 102, 56, 255}, Color{124, 78, 40, 255});
         DrawLine((int)r.x + 14, (int)(y + 8), (int)(r.x + r.width - 14), (int)(y + 10), Fade(Color{90, 55, 28, 255}, 0.5f));
@@ -572,23 +726,260 @@ void desenharToalha(float W, float y, float H) {
 }
 
 // ============================================================
+//  FOTOS DOS MERCADOS (opcionais: pasta fotos/)
+// ============================================================
+
+// Desenha a textura preenchendo "destino" sem deformar (corta o que sobra)
+void desenharFotoCobrindo(Texture2D t, Rectangle destino, Color tinta = WHITE) {
+    float proporcaoFoto = (float)t.width / t.height, proporcaoDestino = destino.width / destino.height;
+    Rectangle origem = {0, 0, (float)t.width, (float)t.height};
+    if (proporcaoFoto > proporcaoDestino) {
+        origem.width = t.height * proporcaoDestino;
+        origem.x = (t.width - origem.width) / 2;
+    } else {
+        origem.height = t.width / proporcaoDestino;
+        origem.y = (t.height - origem.height) / 2;
+    }
+    DrawTexturePro(t, origem, destino, {0, 0}, 0, tinta);
+}
+
+// ============================================================
 //  FEIRANTE "SEU ZE"
 // ============================================================
 
-// base = centro de baixo do corpo. humor: 0 normal, 1 feliz
-void desenharFeirante(Vector2 base, float s, float tempo, int humor) {
+// ------------------------------------------------------------
+//  Figurinos: o Seu Ze se veste conforme a feira onde esta.
+//  O indice e o numero do capitulo (0 = Sao Paulo ... 9 = Toquio).
+// ------------------------------------------------------------
+enum Chapeu { CH_PALHA, CH_COURO, CH_PANAMA, CH_GAUCHO, CH_BOINA, CH_BARRETINA, CH_PALHINHA, CH_TARBUSH, CH_HACHIMAKI };
+enum Estampa { LISO, XADREZ, FOLHAS };
+
+struct Figurino {
+    Chapeu chapeu;
+    Color camisa;
+    Estampa estampa;
+    Color avental;  // alpha 0 = sem avental
+    Color colete;   // alpha 0 = sem colete
+    Color lenco;    // alpha 0 = sem lenco no pescoco
+    Color faixa;    // alpha 0 = sem faixa na cintura
+    bool happi;     // casaco japones de feira
+};
+
+const Color SEM = {0, 0, 0, 0};
+const Color AVENTAL_BRANCO = {250, 246, 236, 255};
+
+const Figurino FIGURINOS[] = {
+    // Sao Paulo: o Seu Ze de sempre
+    {CH_PALHA, {62, 110, 180, 255}, LISO, AVENTAL_BRANCO, SEM, SEM, SEM, false},
+    // Belo Horizonte: camisa xadrez de mineiro
+    {CH_PALHA, {196, 58, 52, 255}, XADREZ, AVENTAL_BRANCO, SEM, SEM, SEM, false},
+    // Caruaru: chapeu de couro de vaqueiro, gibao e lenco
+    {CH_COURO, {236, 222, 190, 255}, LISO, SEM, {150, 92, 50, 255}, {214, 64, 50, 255}, SEM, false},
+    // Belem: camisa estampada de folhas e chapeu panama
+    {CH_PANAMA, {40, 128, 96, 255}, FOLHAS, SEM, SEM, SEM, SEM, false},
+    // Porto Alegre: pilcha gaucha, com lenco vermelho e chapeu de aba
+    {CH_GAUCHO, {244, 240, 230, 255}, LISO, SEM, {50, 46, 44, 255}, {200, 36, 40, 255}, SEM, false},
+    // Porto: boina e colete
+    {CH_BOINA, {244, 240, 230, 255}, LISO, SEM, {46, 50, 62, 255}, SEM, SEM, false},
+    // Barcelona: barretina catala e faixa vermelha
+    {CH_BARRETINA, {244, 240, 230, 255}, LISO, SEM, SEM, SEM, {200, 40, 44, 255}, false},
+    // Florenca: chapeu de palhinha florentino e avental verde
+    {CH_PALHINHA, {244, 240, 230, 255}, LISO, {60, 140, 80, 255}, SEM, {200, 44, 48, 255}, SEM, false},
+    // Beirute: tarbush e colete bordado
+    {CH_TARBUSH, {244, 240, 230, 255}, LISO, SEM, {120, 30, 40, 255}, SEM, SEM, false},
+    // Toquio: faixa hachimaki e casaco happi
+    {CH_HACHIMAKI, {40, 62, 120, 255}, LISO, SEM, SEM, SEM, SEM, true},
+};
+const int TOTAL_FIGURINOS = sizeof(FIGURINOS) / sizeof(FIGURINOS[0]);
+
+void desenharCorpoFeirante(float x, float y0, float s, const Figurino& f) {
+    Rectangle tronco = {x - 66 * s, y0 - 84 * s, 132 * s, 96 * s};
+    DrawRectangleRounded(tronco, 0.45f, 10, f.camisa);
+    if (f.estampa == XADREZ) {
+        Color listra = Fade(escurecer(f.camisa, 0.45f), 0.55f), fina = Fade(WHITE, 0.3f);
+        for (int i = -2; i <= 2; i++) {
+            DrawRectangle((int)(x + (i * 24 - 5) * s), (int)(y0 - 80 * s), (int)(10 * s), (int)(88 * s), listra);
+            DrawRectangle((int)(x + (i * 24 + 9) * s), (int)(y0 - 80 * s), (int)(2 * s) + 1, (int)(88 * s), fina);
+        }
+        for (int j = 0; j < 4; j++) {
+            float yy = y0 + (-72 + j * 22) * s;
+            DrawRectangle((int)(x - 60 * s), (int)yy, (int)(120 * s), (int)(8 * s), listra);
+            DrawRectangle((int)(x - 60 * s), (int)(yy + 12 * s), (int)(120 * s), (int)(2 * s) + 1, fina);
+        }
+    } else if (f.estampa == FOLHAS) {
+        Color folha = clarear(f.camisa, 0.45f);
+        const float P[][2] = {{-48, -66}, {-20, -44}, {-44, -18}, {10, -70}, {34, -40}, {50, -12}, {-4, -8}, {46, -70}};
+        for (auto& p : P) {
+            DrawEllipse((int)(x + p[0] * s), (int)(y0 + p[1] * s), 9 * s, 5 * s, folha);
+            DrawLineEx({x + (p[0] - 8) * s, y0 + (p[1] + 3) * s}, {x + (p[0] + 8) * s, y0 + (p[1] - 3) * s}, 1.5f * s, f.camisa);
+        }
+        DrawCircleV({x - 30 * s, y0 - 58 * s}, 5 * s, Color{250, 200, 70, 255});
+        DrawCircleV({x + 24 * s, y0 - 20 * s}, 5 * s, Color{250, 120, 90, 255});
+    }
+    if (f.happi) {
+        // Gola branca larga descendo pela frente, com letras de feira nas laterais
+        Color gola = {244, 240, 230, 255};
+        DrawLineEx({x - 20 * s, y0 - 84 * s}, {x - 8 * s, y0 + 12 * s}, 14 * s, gola);
+        DrawLineEx({x + 20 * s, y0 - 84 * s}, {x + 8 * s, y0 + 12 * s}, 14 * s, gola);
+        for (int lado : {-1, 1}) {
+            DrawRectangle((int)(x + lado * 42 * s - 6 * s), (int)(y0 - 60 * s), (int)(12 * s), (int)(3 * s) + 1, gola);
+            DrawRectangle((int)(x + lado * 42 * s - 1.5f * s), (int)(y0 - 66 * s), (int)(3 * s) + 1, (int)(20 * s), gola);
+            DrawRectangle((int)(x + lado * 42 * s - 6 * s), (int)(y0 - 50 * s), (int)(12 * s), (int)(3 * s) + 1, gola);
+        }
+        DrawRectangle((int)(x - 66 * s), (int)(y0 + 2 * s), (int)(132 * s), (int)(6 * s), Color{200, 44, 48, 255});
+    }
+    if (f.colete.a > 0) {
+        Color trim = f.chapeu == CH_TARBUSH ? Color{230, 186, 80, 255} : clarear(f.colete, 0.25f);
+        DrawRectangleRounded({x - 66 * s, y0 - 80 * s, 44 * s, 92 * s}, 0.4f, 8, f.colete);
+        DrawRectangleRounded({x + 22 * s, y0 - 80 * s, 44 * s, 92 * s}, 0.4f, 8, f.colete);
+        DrawLineEx({x - 22 * s, y0 - 76 * s}, {x - 22 * s, y0 + 8 * s}, 3 * s, trim);
+        DrawLineEx({x + 22 * s, y0 - 76 * s}, {x + 22 * s, y0 + 8 * s}, 3 * s, trim);
+        if (f.chapeu == CH_TARBUSH) {  // bordado dourado
+            for (int lado : {-1, 1})
+                for (int j = 0; j < 3; j++) DrawCircleV({x + lado * 40 * s, y0 + (-56 + j * 22) * s}, 3.5f * s, trim);
+        } else {
+            for (int j = 0; j < 3; j++) DrawCircleV({x + 28 * s, y0 + (-58 + j * 20) * s}, 2.8f * s, trim);
+        }
+    }
+    if (f.avental.a > 0) {
+        DrawRectangleRounded({x - 40 * s, y0 - 64 * s, 80 * s, 80 * s}, 0.25f, 8, f.avental);
+        DrawLineEx({x - 36 * s, y0 - 62 * s}, {x - 26 * s, y0 - 84 * s}, 5 * s, f.avental);
+        DrawLineEx({x + 36 * s, y0 - 62 * s}, {x + 26 * s, y0 - 84 * s}, 5 * s, f.avental);
+        DrawRectangleRounded({x - 18 * s, y0 - 40 * s, 36 * s, 24 * s}, 0.3f, 6, escurecer(f.avental, 0.08f));
+    }
+    if (f.faixa.a > 0) {
+        DrawRectangle((int)(x - 66 * s), (int)(y0 - 12 * s), (int)(132 * s), (int)(16 * s), f.faixa);
+        DrawLineEx({x + 40 * s, y0 - 2 * s}, {x + 46 * s, y0 + 14 * s}, 6 * s, f.faixa);
+        DrawLineEx({x + 50 * s, y0 - 2 * s}, {x + 58 * s, y0 + 12 * s}, 6 * s, f.faixa);
+    }
+}
+
+void desenharChapeu(Vector2 cab, float s, const Figurino& f) {
+    Color cabelo = {196, 190, 184, 255};
+    switch (f.chapeu) {
+        case CH_PALHA: {
+            Color palha = {236, 196, 116, 255}, palhaEscura = {190, 146, 70, 255};
+            DrawEllipse((int)cab.x, (int)(cab.y - 30 * s), 74 * s + 2, 17 * s + 2, palhaEscura);
+            DrawEllipse((int)cab.x, (int)(cab.y - 30 * s), 74 * s, 17 * s, palha);
+            DrawRectangleRounded({cab.x - 40 * s, cab.y - 74 * s, 80 * s, 46 * s}, 0.5f, 8, palha);
+            DrawRectangle((int)(cab.x - 40 * s), (int)(cab.y - 44 * s), (int)(80 * s), (int)(11 * s), Color{200, 50, 46, 255});
+            DrawLineEx(mais(cab, -30 * s, -66 * s), mais(cab, -28 * s, -46 * s), 2 * s, palhaEscura);
+            DrawLineEx(mais(cab, 0, -70 * s), mais(cab, 0, -46 * s), 2 * s, palhaEscura);
+            DrawLineEx(mais(cab, 30 * s, -66 * s), mais(cab, 28 * s, -46 * s), 2 * s, palhaEscura);
+            break;
+        }
+        case CH_COURO: {
+            // Chapeu de vaqueiro nordestino: copa redonda e aba da frente virada para cima, em meia-lua
+            Color couro = {150, 92, 50, 255}, couroEscuro = {104, 58, 30, 255}, enfeite = {236, 200, 120, 255};
+            DrawEllipse((int)cab.x, (int)(cab.y - 30 * s), 60 * s, 12 * s, couroEscuro);  // aba de tras
+            DrawCircleV(mais(cab, 0, -46 * s), 34 * s, couroEscuro);                       // copa
+            // aba da frente: meia-lua grande com as pontas subindo
+            for (int i = 0; i <= 16; i++) {
+                float t = i / 16.0f, ang = (190 + t * 160) * DEG2RAD;
+                Vector2 p = mais(cab, cosf(ang) * 62 * s, -30 * s + sinf(ang) * 40 * s);
+                DrawCircleV(p, (14 - fabsf(t - 0.5f) * 14) * s + 5 * s, couro);
+            }
+            DrawEllipse((int)cab.x, (int)(cab.y - 52 * s), 46 * s, 22 * s, couro);
+            for (int i = 1; i < 12; i++) {
+                float t = i / 12.0f, ang = (195 + t * 150) * DEG2RAD;
+                DrawCircleV(mais(cab, cosf(ang) * 50 * s, -30 * s + sinf(ang) * 30 * s), 2.8f * s, enfeite);
+            }
+            desenharEstrela(mais(cab, 0, -54 * s), 12 * s, enfeite);
+            break;
+        }
+        case CH_PANAMA: {
+            Color palha = {246, 238, 214, 255}, sombra = {210, 198, 170, 255};
+            DrawEllipse((int)cab.x, (int)(cab.y - 32 * s), 68 * s + 2, 14 * s + 2, sombra);
+            DrawEllipse((int)cab.x, (int)(cab.y - 32 * s), 68 * s, 14 * s, palha);
+            DrawRectangleRounded({cab.x - 38 * s, cab.y - 70 * s, 76 * s, 40 * s}, 0.45f, 8, palha);
+            DrawLineEx(mais(cab, -14 * s, -69 * s), mais(cab, 14 * s, -69 * s), 3 * s, sombra);
+            DrawRectangle((int)(cab.x - 38 * s), (int)(cab.y - 46 * s), (int)(76 * s), (int)(10 * s), Color{40, 40, 44, 255});
+            break;
+        }
+        case CH_GAUCHO: {
+            Color feltro = {40, 38, 38, 255};
+            // barbicacho (tira que passa embaixo do queixo)
+            for (int g = -10; g <= 190; g += 8) {  // contorna o queixo, sem cruzar o rosto
+                float ang = g * DEG2RAD;
+                DrawCircleV(mais(cab, cosf(ang) * 47 * s, sinf(ang) * 47 * s), 1.4f * s, Color{90, 70, 50, 255});
+            }
+            DrawLineEx(mais(cab, -46 * s, -34 * s), mais(cab, -46 * s, -8 * s), 2.8f * s, Color{90, 70, 50, 255});
+            DrawLineEx(mais(cab, 46 * s, -34 * s), mais(cab, 46 * s, -8 * s), 2.8f * s, Color{90, 70, 50, 255});
+            DrawEllipse((int)cab.x, (int)(cab.y - 34 * s), 80 * s, 12 * s, feltro);
+            DrawRectangleRounded({cab.x - 38 * s, cab.y - 68 * s, 76 * s, 36 * s}, 0.2f, 6, feltro);
+            DrawRectangle((int)(cab.x - 38 * s), (int)(cab.y - 46 * s), (int)(76 * s), (int)(8 * s), Color{90, 70, 50, 255});
+            break;
+        }
+        case CH_BOINA: {
+            Color boina = {52, 54, 64, 255};
+            DrawEllipse((int)(cab.x + 4 * s), (int)(cab.y - 38 * s), 54 * s, 22 * s, boina);
+            DrawEllipse((int)(cab.x + 4 * s), (int)(cab.y - 44 * s), 46 * s, 14 * s, clarear(boina, 0.12f));
+            DrawEllipse((int)(cab.x - 8 * s), (int)(cab.y - 22 * s), 40 * s, 8 * s, escurecer(boina, 0.3f));
+            DrawCircleV(mais(cab, 4 * s, -58 * s), 4 * s, boina);
+            break;
+        }
+        case CH_BARRETINA: {
+            Color vermelho = {200, 40, 44, 255};
+            // Gorro que cai para o lado, desenhado como uma fileira de circulos
+            for (int i = 0; i <= 12; i++) {
+                float t = i / 12.0f;
+                Vector2 p = mais(cab, (-4 + t * 54) * s, (-46 - sinf(t * PI) * 30 + t * 10) * s);
+                DrawCircleV(p, (32 - t * 20) * s, vermelho);
+            }
+            DrawRectangleRounded({cab.x - 44 * s, cab.y - 44 * s, 88 * s, 18 * s}, 0.5f, 6, escurecer(vermelho, 0.35f));
+            break;
+        }
+        case CH_PALHINHA: {
+            Color palha = {240, 212, 140, 255}, sombra = {196, 160, 90, 255};
+            DrawEllipse((int)cab.x, (int)(cab.y - 34 * s), 72 * s + 2, 10 * s + 2, sombra);
+            DrawEllipse((int)cab.x, (int)(cab.y - 34 * s), 72 * s, 10 * s, palha);
+            DrawRectangle((int)(cab.x - 38 * s), (int)(cab.y - 62 * s), (int)(76 * s), (int)(28 * s), palha);
+            DrawEllipse((int)cab.x, (int)(cab.y - 62 * s), 38 * s, 6 * s, clarear(palha, 0.2f));
+            // fita com as cores da Italia
+            float fx = cab.x - 38 * s, largura = 76 * s / 3;
+            DrawRectangle((int)fx, (int)(cab.y - 48 * s), (int)largura + 1, (int)(9 * s), Color{0, 140, 70, 255});
+            DrawRectangle((int)(fx + largura), (int)(cab.y - 48 * s), (int)largura + 1, (int)(9 * s), WHITE);
+            DrawRectangle((int)(fx + 2 * largura), (int)(cab.y - 48 * s), (int)largura + 1, (int)(9 * s), Color{206, 43, 55, 255});
+            break;
+        }
+        case CH_TARBUSH: {
+            Color vermelho = {180, 32, 40, 255};
+            Vector2 a = mais(cab, -36 * s, -26 * s), b = mais(cab, 36 * s, -26 * s);
+            Vector2 c = mais(cab, 28 * s, -80 * s), d = mais(cab, -28 * s, -80 * s);
+            triangulo(a, b, c, vermelho);
+            triangulo(a, c, d, vermelho);
+            DrawEllipse((int)cab.x, (int)(cab.y - 80 * s), 28 * s, 6 * s, escurecer(vermelho, 0.2f));
+            // borla preta
+            DrawLineEx(mais(cab, 0, -80 * s), mais(cab, 26 * s, -64 * s), 3 * s, Color{30, 30, 30, 255});
+            DrawLineEx(mais(cab, 26 * s, -64 * s), mais(cab, 30 * s, -40 * s), 7 * s, Color{30, 30, 30, 255});
+            break;
+        }
+        case CH_HACHIMAKI: {
+            // cabelo grisalho curto e a faixa branca na testa
+            DrawEllipse((int)cab.x, (int)(cab.y - 26 * s), 46 * s, 26 * s, cabelo);
+            DrawRectangleRounded({cab.x - 47 * s, cab.y - 32 * s, 94 * s, 14 * s}, 0.5f, 6, Color{248, 246, 240, 255});
+            DrawCircleV(mais(cab, 0, -25 * s), 5.5f * s, Color{206, 30, 40, 255});
+            DrawEllipse((int)(cab.x + 52 * s), (int)(cab.y - 30 * s), 9 * s, 5 * s, Color{248, 246, 240, 255});
+            DrawLineEx(mais(cab, 52 * s, -28 * s), mais(cab, 62 * s, -14 * s), 5 * s, Color{248, 246, 240, 255});
+            break;
+        }
+    }
+}
+
+// base = centro de baixo do corpo. humor: 0 normal, 1 feliz. estilo = capitulo (roupa do lugar)
+void desenharFeirante(Vector2 base, float s, float tempo, int humor, int estilo = 0) {
+    const Figurino& fig = FIGURINOS[((estilo % TOTAL_FIGURINOS) + TOTAL_FIGURINOS) % TOTAL_FIGURINOS];
     float y0 = base.y + sinf(tempo * 2.2f) * 2 * s;
     float x = base.x;
     Color pele = {242, 192, 150, 255}, peleEscura = {214, 156, 116, 255};
 
-    // Corpo: camisa azul e avental
-    DrawRectangleRounded({x - 66 * s, y0 - 84 * s, 132 * s, 96 * s}, 0.45f, 10, Color{62, 110, 180, 255});
-    DrawRectangleRounded({x - 40 * s, y0 - 64 * s, 80 * s, 80 * s}, 0.25f, 8, Color{250, 246, 236, 255});
-    DrawLineEx({x - 36 * s, y0 - 62 * s}, {x - 26 * s, y0 - 84 * s}, 5 * s, Color{250, 246, 236, 255});
-    DrawLineEx({x + 36 * s, y0 - 62 * s}, {x + 26 * s, y0 - 84 * s}, 5 * s, Color{250, 246, 236, 255});
-    DrawRectangleRounded({x - 18 * s, y0 - 40 * s, 36 * s, 24 * s}, 0.3f, 6, Color{232, 222, 205, 255});
+    desenharCorpoFeirante(x, y0, s, fig);
     // Pescoco
     DrawRectangle((int)(x - 14 * s), (int)(y0 - 98 * s), (int)(28 * s), (int)(18 * s), peleEscura);
+    if (fig.lenco.a > 0) {
+        triangulo({x - 26 * s, y0 - 88 * s}, {x + 26 * s, y0 - 88 * s}, {x, y0 - 56 * s}, fig.lenco);
+        DrawCircleV({x, y0 - 86 * s}, 7 * s, escurecer(fig.lenco, 0.2f));
+    }
 
     // Cabeca
     Vector2 cab = {x, y0 - 138 * s};
@@ -630,15 +1021,7 @@ void desenharFeirante(Vector2 base, float s, float tempo, int humor) {
     DrawEllipse((int)(cab.x - 13 * s), (int)(cab.y + 19 * s), 15 * s, 7 * s, bigode);
     DrawEllipse((int)(cab.x + 13 * s), (int)(cab.y + 19 * s), 15 * s, 7 * s, bigode);
 
-    // Chapeu de palha
-    Color palha = {236, 196, 116, 255}, palhaEscura = {190, 146, 70, 255};
-    DrawEllipse((int)cab.x, (int)(cab.y - 30 * s), 74 * s + 2, 17 * s + 2, palhaEscura);
-    DrawEllipse((int)cab.x, (int)(cab.y - 30 * s), 74 * s, 17 * s, palha);
-    DrawRectangleRounded({cab.x - 40 * s, cab.y - 74 * s, 80 * s, 46 * s}, 0.5f, 8, palha);
-    DrawRectangle((int)(cab.x - 40 * s), (int)(cab.y - 44 * s), (int)(80 * s), (int)(11 * s), Color{200, 50, 46, 255});
-    DrawLineEx(mais(cab, -30 * s, -66 * s), mais(cab, -28 * s, -46 * s), 2 * s, palhaEscura);
-    DrawLineEx(mais(cab, 0, -70 * s), mais(cab, 0, -46 * s), 2 * s, palhaEscura);
-    DrawLineEx(mais(cab, 30 * s, -66 * s), mais(cab, 28 * s, -46 * s), 2 * s, palhaEscura);
+    desenharChapeu(cab, s, fig);
 }
 
 // Balao de fala com rabinho apontando para "ponta"
@@ -862,20 +1245,39 @@ void desenharCaminhao(Vector2 c, float s, float tempo, float direcao = 1) {
     }
 }
 
+
+// Aviaozinho do Seu Ze (para atravessar o oceano). "direcao" 1 = para a direita
+void desenharAviao(Vector2 c, float s, float tempo, float direcao = 1) {
+    float y = c.y + sinf(tempo * 3) * 3 * s;
+    auto X = [&](float dx) { return c.x + dx * s * direcao; };
+    DrawEllipse((int)c.x, (int)(c.y + 40 * s), 40 * s, 6 * s, Fade(BLACK, 0.18f));
+    // Asa de tras e cauda
+    triangulo({X(-4), y}, {X(-22), y - 26 * s}, {X(-10), y}, Color{190, 200, 214, 255});
+    triangulo({X(-40), y - 2 * s}, {X(-50), y - 22 * s}, {X(-30), y - 2 * s}, Color{210, 52, 48, 255});
+    // Fuselagem
+    DrawEllipse((int)X(-2), (int)y, 46 * s, 11 * s, Color{120, 130, 150, 255});
+    DrawEllipse((int)X(-2), (int)y, 44 * s, 9.5f * s, Color{248, 250, 252, 255});
+    DrawRectangle((int)min(X(-40), X(38)), (int)(y + 2 * s), (int)(78 * s), (int)(3 * s), Color{210, 52, 48, 255});
+    for (int i = 0; i < 5; i++) DrawCircleV({X(-22 + i * 10.0f), y - 2.5f * s}, 2.4f * s, Color{120, 180, 230, 255});
+    DrawEllipse((int)X(36), (int)(y - 2 * s), 7 * s, 5 * s, Color{120, 180, 230, 255});
+    // Asa da frente
+    triangulo({X(6), y + 2 * s}, {X(-16), y + 30 * s}, {X(-4), y + 2 * s}, Color{210, 218, 230, 255});
+}
+
 // Marcador de cidade no mapa. estado: 0 bloqueada, 1 atual, 2 concluida
-void desenharMarcadorCidade(Vector2 p, int estado, float tempo) {
+void desenharMarcadorCidade(Vector2 p, int estado, float tempo, float escala = 1) {
     float pulso = estado == 1 ? 1 + 0.12f * sinf(tempo * 5) : 1;
-    float r = 17 * pulso;
+    float r = 17 * pulso * escala;
     Color cor = estado == 0 ? Color{160, 152, 142, 255} : (estado == 1 ? COR_LARANJA : COR_VERDE);
     DrawCircleV(mais(p, 0, 3), r + 3, Fade(BLACK, 0.25f));
     if (estado == 1) DrawCircleV(p, r + 7, Fade(COR_OURO, 0.7f));
     DrawCircleV(p, r + 3, WHITE);
     DrawCircleV(p, r, cor);
     if (estado == 2) {
-        DrawLineEx(mais(p, -7, 0), mais(p, -2, 6), 3.5f, WHITE);
-        DrawLineEx(mais(p, -2, 6), mais(p, 8, -6), 3.5f, WHITE);
+        DrawLineEx(mais(p, -7 * escala, 0), mais(p, -2 * escala, 6 * escala), 3.5f * escala, WHITE);
+        DrawLineEx(mais(p, -2 * escala, 6 * escala), mais(p, 8 * escala, -6 * escala), 3.5f * escala, WHITE);
     } else if (estado == 0) {
-        desenharCadeado(p, 0.55f, Color{240, 236, 230, 255});
+        desenharCadeado(p, 0.55f * escala, Color{240, 236, 230, 255});
     } else {
         DrawCircleV(p, r * 0.35f, WHITE);
     }

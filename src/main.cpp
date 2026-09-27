@@ -133,7 +133,7 @@ Font carregarFonte() {
     if (!FileExists(caminho.c_str())) return GetFontDefault();
     vector<int> letras;
     for (int c = 32; c < 127; c++) letras.push_back(c);
-    const char* acentuadas = "áàâãéêíóôõúüçÁÀÂÃÉÊÍÓÔÕÚÜÇ";
+    const char* acentuadas = "áàâãéêíóôõúüçÁÀÂÃÉÊÍÓÔÕÚÜÇ·–";
     for (int i = 0; acentuadas[i] != '\0';) {
         int tamanho = 0;
         letras.push_back(GetCodepoint(acentuadas + i, &tamanho));
@@ -169,6 +169,7 @@ float deslocamentoVertical(float H, bool retrato) {
 const int MOEDAS_INICIAIS = 100;   // presente de boas-vindas
 const int CUSTO_CAIXOTE = 60;      // reforco "caixote extra"
 const int PREMIO_DESAFIO = 100;    // desafio do dia
+const int LIMITE_DESFAZER = 3;     // quantas vezes da para desfazer em cada fase
 
 // ============================================================
 //  LAYOUT DA TELA DE JOGO: muda se a tela esta deitada
@@ -329,6 +330,45 @@ struct Toque {
 
 const float ESPACO_NO_MAPA = 150;
 
+// ============================================================
+//  FOTOS DOS MERCADOS
+//  Opcionais: se fotos/<nome>.png existir, aparece no postal e,
+//  desfocada e clarinha, no fundo das fases daquela feira.
+//  Carregadas so quando precisa (a primeira vez que aparecem).
+// ============================================================
+struct FotoDaFeira {
+    bool tentou = false, tem = false;
+    Texture2D nitida{}, desfocada{};
+    string credito;
+};
+FotoDaFeira fotosDasFeiras[TOTAL_CAPITULOS];
+
+const FotoDaFeira& fotoDaFeira(int c) {
+    FotoDaFeira& f = fotosDasFeiras[c];
+    if (f.tentou) return f;
+    f.tentou = true;
+    string base = string(GetApplicationDirectory()) + "fotos/" + ARQUIVO_FOTO[c];
+    if (!FileExists((base + ".png").c_str())) return f;
+    Image img = LoadImage((base + ".png").c_str());
+    if (img.data == nullptr) return f;
+    f.nitida = LoadTextureFromImage(img);
+    SetTextureFilter(f.nitida, TEXTURE_FILTER_BILINEAR);
+    // Versao desfocada: encolhe bastante e deixa a placa de video esticar suavemente
+    ImageResize(&img, 180, max(1, img.height * 180 / img.width));
+    f.desfocada = LoadTextureFromImage(img);
+    SetTextureFilter(f.desfocada, TEXTURE_FILTER_BILINEAR);
+    UnloadImage(img);
+    if (FileExists((base + ".txt").c_str())) {
+        char* t = LoadFileText((base + ".txt").c_str());
+        f.credito = t;
+        UnloadFileText(t);
+        while (!f.credito.empty() && (f.credito.back() == '\n' || f.credito.back() == '\r' || f.credito.back() == ' '))
+            f.credito.pop_back();
+    }
+    f.tem = true;
+    return f;
+}
+
 struct Jogo {
     Tela tela = MENU;
     bool mostrarAjuda = false;
@@ -345,6 +385,7 @@ struct Jogo {
     Escondidas escondidas;
     vector<Feira> historico;
     int jogadas = 0, dicasUsadas = 0;
+    int desfazerRestantes = LIMITE_DESFAZER;
     bool usouCaixote = false;
     int selecionado = -1;
     bool ganhou = false, travou = false;
@@ -368,13 +409,14 @@ struct Jogo {
     float rolagemMapa = 0;
     Toque toque;
     int capituloMapa = 0, voltaMapa = 0;  // qual feira o mapa de fases mostra
+    int regiaoTela = 0;                   // mapa da viagem: 0 = Brasil, 1 = mundo
     int postalAberto = -1;                // postal na tela (-1 = nenhum)
     bool postalDaConquista = false;       // aberto logo depois de completar a feira
     bool viajando = false;                // caminhao indo para a proxima feira
     int viagemDe = 0, viagemPara = 0;
     float tempoViagem = 0;
 
-    int capituloDoJogo() const { return desafio ? dataDeHoje() % TOTAL_CAPITULOS : capituloDaFase(fase); }
+    int capituloDoJogo() const { return desafio ? dataDeHoje() % CAPITULOS_POR_REGIAO : capituloDaFase(fase); }
 
     void carregarProgresso() {
         progresso.carregar();
@@ -401,6 +443,8 @@ struct Jogo {
         fase = f;
         desafio = ehDesafio;
         nivel = desafio ? nivelDoDesafio(dataDeHoje()) : nivelDaFase(f);
+        CAPACIDADE = nivel.capacidade;
+        ajustarVagas(CAPACIDADE);
         usouCaixote = false;
         reiniciarNivel();
         tela = JOGO;
@@ -408,9 +452,13 @@ struct Jogo {
         if (desafio) {
             falar("Desafio do dia! Vale " + to_string(PREMIO_DESAFIO) + " moedas. Boa sorte!", 5, 1);
         } else if (posicaoNoCapitulo(fase) == 0) {
-            falar("Chegamos em " + string(cap.curto) + "! Aqui a banca tem " + NOMES_FRUTAS[cap.regionais[0]] + " e " +
+            falar(string(cap.chegada) + " Aqui a banca tem " + NOMES_FRUTAS[cap.regionais[0]] + " e " +
                       NOMES_FRUTAS[cap.regionais[1]] + ".",
                   6, 1);
+        } else if (nivel.capacidade == 5) {
+            falar("Banca grande hoje! Os caixotes levam 5 frutas. Com calma, que dá!", 6, 1);
+        } else if (nivel.capacidade == 3) {
+            falar("Fase rapidinha! Os caixotes hoje são pequenos: 3 frutas em cada.", 5, 1);
         } else if (fase == PRIMEIRA_FASE_ESCONDIDA) {
             falar("Novidade! Algumas frutas vêm no saquinho. Elas aparecem quando ficam em cima!", 7, 1);
         } else {
@@ -435,6 +483,7 @@ struct Jogo {
         revelarTopos(feira, escondidas);
         historico.clear();
         jogadas = dicasUsadas = 0;
+        desfazerRestantes = LIMITE_DESFAZER;
         selecionado = -1;
         ganhou = travou = false;
         tempoDica = 0;
@@ -449,7 +498,12 @@ struct Jogo {
         vector<Jogada> caminho;
         bool estourou;
         travou = !resolver(feira, caminho, estourou) && !estourou;
-        if (travou) falar("Opa, a banca travou! Toque em DESFAZER para voltar.", 5, 0);
+        if (travou) falar(mensagemTravou(), 5, 0);
+    }
+
+    string mensagemTravou() const {
+        if (desfazerRestantes > 0) return "Opa, a banca travou! Toque em DESFAZER para voltar.";
+        return "A banca travou e acabaram os desfazer. Toque em REINICIAR para começar de novo.";
     }
 
     int estrelas() const {
@@ -460,7 +514,7 @@ struct Jogo {
 
     string falaAtual() const {
         if (tempoFala > 0) return fala;
-        if (travou) return "Opa, a banca travou! Toque em DESFAZER para voltar.";
+        if (travou) return mensagemTravou();
         if (selecionado >= 0) return "Agora toque no caixote onde quer colocar.";
         return "Toque num caixote para pegar as frutas de cima.";
     }
@@ -521,6 +575,12 @@ struct Jogo {
             falar("Ainda não tem jogada para desfazer.");
             return;
         }
+        if (desfazerRestantes <= 0) {
+            falar("Você já desfez " + to_string(LIMITE_DESFAZER) + " vezes nesta fase. Se travar, toque em REINICIAR.");
+            sons.tocar(sons.erro);
+            return;
+        }
+        desfazerRestantes--;
         feira = historico.back();
         historico.pop_back();
         revelarTopos(feira, escondidas);
@@ -688,12 +748,19 @@ struct Jogo {
     void desenharJogo(const Layout& L, Vector2 mouse, float tempo) {
         const Capitulo& cap = CAPITULOS[capituloDoJogo()];
         desenharCeu(L.W, L.H, tempo, cap.ceuTopo, cap.ceuBase);
+        const FotoDaFeira& foto = fotoDaFeira(capituloDoJogo());
+        if (foto.tem) {
+            // Foto do mercado ao fundo, desfocada e clareada para as frutas continuarem em destaque
+            desenharFotoCobrindo(foto.desfocada, {0, 0, L.W, L.H});
+            DrawRectangleGradientV(0, 0, (int)L.W, (int)L.H, Fade(clarear(cap.ceuTopo, 0.3f), 0.38f),
+                                   Fade(clarear(cap.ceuBase, 0.3f), 0.38f));
+        }
         desenharBandeirinhas(L.W, 70, tempo);
         desenharToldo(L.W, cap.toldoA, cap.toldoB);
         for (float y : L.prateleiras) desenharPrateleira(L.W, y);
         desenharToalha(L.W, L.prateleiras.back() + 26, L.H);
 
-        desenharFeirante(L.feirante, L.escalaFeirante, tempo, humor);
+        desenharFeirante(L.feirante, L.escalaFeirante, tempo, humor, capituloDoJogo());
         desenharBalao(L.balao, falaAtual(), L.pontaBalao, L.retrato ? 25 : 26);
         if (desafio) desenharPilula(L.pilulaFase, "Desafio", "do dia");
         else desenharPilula(L.pilulaFase, "Fase", to_string(fase));
@@ -729,8 +796,8 @@ struct Jogo {
                 Vector2 p = posicaoVaga(r, k);
                 if (k >= visiveis - levantadas) p.y -= ALTURA_LEVANTADA + sinf(tempo * 5) * 3;
                 else if (emCima && selecionado == -1 && k == visiveis - 1) p.y -= 4 + sinf(tempo * 8) * 2;
-                if (escondidas[i][k]) desenharSaquinho(p, pulo);
-                else desenharFruta(feira[i][k], p, pulo);
+                if (escondidas[i][k]) desenharSaquinho(p, pulo * ESCALA_FRUTA);
+                else desenharFruta(feira[i][k], p, pulo * ESCALA_FRUTA);
             }
 
             if (pronto) desenharSeloPronto(r, efeitoMola(tempoSelo[i] / 0.4f));
@@ -744,14 +811,14 @@ struct Jogo {
                 origem.y -= ALTURA_LEVANTADA;
                 Vector2 destino = posicaoVaga(L.caixotes[voo.para], voo.tamanhoDestino + q);
                 Vector2 p = {origem.x + (destino.x - origem.x) * t, origem.y + (destino.y - origem.y) * t - sinf(PI * t) * 110};
-                desenharFruta(voo.fruta, p, 1.0f + 0.12f * sinf(PI * t));
+                desenharFruta(voo.fruta, p, (1.0f + 0.12f * sinf(PI * t)) * ESCALA_FRUTA);
             }
         }
 
         // Botoes
         for (const Botao* b : {&L.desfazer, &L.dica, &L.reiniciar, &L.caixote, &L.mapa, &L.som}) {
             bool ativo = true;
-            if (b == &L.desfazer && historico.empty()) ativo = false;
+            if (b == &L.desfazer && (historico.empty() || desfazerRestantes <= 0)) ativo = false;
             if (b == &L.caixote && usouCaixote) ativo = false;
             desenharBotao(*b, podeInteragir && dentro(mouse, b->r), ativo);
         }
@@ -763,10 +830,20 @@ struct Jogo {
             desenharMoeda({etiqueta.x + 17, etiqueta.y + 16}, 11);
             texto(to_string(CUSTO_CAIXOTE), etiqueta.x + 32, etiqueta.y + 4, 22, WHITE);
         }
-        // Quando trava, o botao DESFAZER brilha
+        // Quantos desfazer ainda restam (bolinha no botao)
+        {
+            Rectangle r = L.desfazer.r;
+            Vector2 bolinha = {r.x + r.width - 8, r.y + 2};
+            Color cor = desfazerRestantes > 0 ? Color{30, 70, 140, 255} : Color{150, 140, 130, 255};
+            DrawCircleV(mais(bolinha, 1, 3), 17, Fade(BLACK, 0.2f));
+            DrawCircleV(bolinha, 17, WHITE);
+            DrawCircleV(bolinha, 14, cor);
+            textoCentro(to_string(desfazerRestantes), bolinha.x, bolinha.y - 12, 22, WHITE);
+        }
+        // Quando trava, brilha o botao que resolve: DESFAZER, ou REINICIAR se acabaram
         if (travou && !voo.ativo) {
             float pulso = 0.5f + 0.5f * sinf(tempo * 6);
-            Rectangle r = L.desfazer.r;
+            Rectangle r = desfazerRestantes > 0 ? L.desfazer.r : L.reiniciar.r;
             contornoArredondado({r.x - 6, r.y - 6, r.width + 12, r.height + 14}, 0.45f, 10, 5, Fade(COR_OURO, pulso));
         }
 
@@ -797,7 +874,7 @@ struct Jogo {
         textoContorno("MUITO BEM!", L.W / 2, topo + 28, 66, COR_VERDE, WHITE, 4);
         bool fimDaFeira = !desafio && ultimaFaseDoCapitulo(fase);
         string subtitulo = desafio ? "Desafio do dia concluído!"
-                                   : (fimDaFeira ? "Você completou a feira de " + string(CAPITULOS[capituloDaFase(fase)].curto) + "!"
+                                   : (fimDaFeira ? "Feira completa: " + string(CAPITULOS[capituloDaFase(fase)].feira) + "!"
                                                  : "Fase " + to_string(fase) + " concluída!");
         textoCentro(subtitulo, L.W / 2, topo + 110, 30, COR_TEXTO);
 
@@ -838,6 +915,7 @@ struct Jogo {
 
     int capituloAtual() const { return capituloDaFase(faseLiberada); }
     int voltaAtual() const { return voltaDaFase(faseLiberada); }
+    bool mundoLiberado() const { return capituloAtual() >= CAPITULOS_POR_REGIAO || voltaAtual() > 0; }
 
     // Estado de cada feira: 0 bloqueada, 1 atual, 2 concluida
     int estadoDoCapitulo(int c) const {
@@ -846,7 +924,7 @@ struct Jogo {
         return 0;
     }
 
-    // Em qual "volta" do Brasil esta a feira c (depois da 5a feira a viagem recomeca)
+    // Em qual "volta" esta a feira c (depois da ultima feira a viagem recomeca)
     int voltaDoCapitulo(int c) const {
         return (c <= capituloAtual() || voltaAtual() == 0) ? voltaAtual() : voltaAtual() - 1;
     }
@@ -857,20 +935,34 @@ struct Jogo {
         return total;
     }
 
-    void irParaBrasil() {
+    // regiao: 0 = Brasil, 1 = mundo, -1 = onde o jogador esta
+    void irParaBrasil(int regiao = -1) {
         tela = BRASIL;
+        regiaoTela = regiao >= 0 ? regiao : capituloAtual() / CAPITULOS_POR_REGIAO;
         particulas.clear();
     }
 
-    // Area do mapa do Brasil e dos cartoes das feiras na tela
+    float larguraDoMapa() const { return regiaoTela == 0 ? BRASIL_LARGURA : MUNDO_LARGURA; }
+
+    // Area do mapa (Brasil ou mundo) e dos cartoes das feiras na tela
     Rectangle areaDoBrasil(float W, float H) const {
         float dy = deslocamentoVertical(H, H > W);
+        float proporcao = larguraDoMapa();
         if (W > H) {
-            float altura = H - 2 * dy - 290;
-            return {W * 0.27f - altura * BRASIL_LARGURA / 2, 150 + dy, altura * BRASIL_LARGURA, altura};
+            float altura = H - 2 * dy - 290, largura = altura * proporcao;
+            if (largura > W * 0.5f - 30) {  // o mapa-mundi e largo: limita pela largura
+                largura = W * 0.5f - 30;
+                altura = largura / proporcao;
+            }
+            float centroY = 150 + dy + (H - 2 * dy - 290) / 2;
+            return {W * 0.27f - largura / 2, centroY - altura / 2, largura, altura};
         }
-        float altura = min(W - 90, 560.0f);
-        return {W / 2 - altura * BRASIL_LARGURA / 2, 150 + dy, altura * BRASIL_LARGURA, altura};
+        float altura = min(W - 90, 500.0f), largura = altura * proporcao;
+        if (largura > W - 40) {
+            largura = W - 40;
+            altura = largura / proporcao;
+        }
+        return {W / 2 - largura / 2, 214 + dy, largura, altura};
     }
 
     Vector2 pontoNoBrasil(const float* xy, float W, float H) const {
@@ -878,11 +970,24 @@ struct Jogo {
         return {a.x + xy[0] * a.height, a.y + xy[1] * a.height};
     }
 
-    Rectangle cartaoDaFeira(int c, float W, float H) const {
+    // Abas BRASIL / MUNDO
+    Rectangle abaDaRegiao(int regiao, float W, float H) const {
         float dy = deslocamentoVertical(H, H > W);
-        if (W > H) return {W * 0.52f, 204 + dy + c * 76.0f, W * 0.48f - 30, 68};
+        if (W > H) {
+            float largura = (W * 0.48f - 30 - 12) / 2;
+            return {W * 0.52f + regiao * (largura + 12), 144 + dy, largura, 50};
+        }
+        float largura = (W - 60 - 12) / 2;
+        return {30 + regiao * (largura + 12), 146 + dy, largura, 52};
+    }
+
+    // k = 0..4 (a k-esima feira da regiao mostrada)
+    Rectangle cartaoDaFeira(int k, float W, float H) const {
+        float dy = deslocamentoVertical(H, H > W);
+        if (W > H) return {W * 0.52f, 212 + dy + k * 74.0f, W * 0.48f - 30, 66};
         Rectangle a = areaDoBrasil(W, H);
-        return {30, a.y + a.height + 26 + c * 76.0f, W - 60, 68};
+        float topo = regiaoTela == 0 ? a.y + a.height + 22 : a.y + a.height + 60;
+        return {30, topo + k * 74.0f, W - 60, 66};
     }
 
     Rectangle botaoInicioTopo() const { return {18, 78, 180, 58}; }
@@ -917,7 +1022,7 @@ struct Jogo {
     void atualizarBrasil(Vector2 mouse, bool clicou, float dt, float W, float H) {
         if (viajando) {
             tempoViagem += dt;
-            if (tempoViagem > 3.2f) viajando = false;
+            if (tempoViagem > 3.4f) viajando = false;
         }
         if (!clicou) return;
         if (dentro(mouse, botaoInicioTopo())) {
@@ -931,18 +1036,41 @@ struct Jogo {
             comecarNivel(faseLiberada, false);
             return;
         }
-        for (int c = 0; c < TOTAL_CAPITULOS; c++) {
-            bool tocou = dentro(mouse, cartaoDaFeira(c, W, H)) ||
-                         distancia(mouse, pontoNoBrasil(CAPITULOS[c].posicao, W, H)) < 36;
-            if (!tocou) continue;
-            if (estadoDoCapitulo(c) == 0) {
+        for (int regiao = 0; regiao < 2; regiao++) {
+            if (!dentro(mouse, abaDaRegiao(regiao, W, H))) continue;
+            if (regiao == 1 && !mundoLiberado()) {
                 sons.tocar(sons.erro);
             } else {
                 sons.tocar(sons.clique);
-                abrirFeira(c, H);
+                regiaoTela = regiao;
             }
             return;
         }
+        // Toque num cartao ou na cidade mais proxima do dedo
+        int escolhido = -1;
+        float maisPerto = 36;
+        for (int k = 0; k < CAPITULOS_POR_REGIAO; k++) {
+            int c = regiaoTela * CAPITULOS_POR_REGIAO + k;
+            if (dentro(mouse, cartaoDaFeira(k, W, H))) escolhido = c;
+            float d = distancia(mouse, pontoNoBrasil(CAPITULOS[c].posicao, W, H));
+            if (escolhido < 0 && d < maisPerto) {
+                maisPerto = d;
+                escolhido = c;
+            }
+        }
+        if (escolhido < 0) return;
+        if (estadoDoCapitulo(escolhido) == 0) {
+            sons.tocar(sons.erro);
+        } else {
+            sons.tocar(sons.clique);
+            abrirFeira(escolhido, H);
+        }
+    }
+
+    // Ponto de partida/chegada de uma viagem, no mapa que esta na tela
+    Vector2 pontoDaViagem(int capitulo, float W, float H) const {
+        if (capitulo / CAPITULOS_POR_REGIAO == regiaoTela) return pontoNoBrasil(CAPITULOS[capitulo].posicao, W, H);
+        return regiaoTela == 1 ? pontoNoBrasil(MUNDO_SP, W, H) : pontoNoBrasil(CIDADE_SP, W, H);
     }
 
     void desenharBrasil(float W, float H, Vector2 mouse, float tempo) {
@@ -954,69 +1082,116 @@ struct Jogo {
             DrawLineEx({x + 26, y - 4}, {x + 52, y}, 3, Fade(WHITE, 0.35f));
         }
 
-        // O Brasil: triangulos preenchidos + contorno
+        // Terra: triangulos preenchidos + contorno
         Rectangle a = areaDoBrasil(W, H);
-        auto ponto = [&](int i) { return Vector2{a.x + BRASIL_XY[i][0] * a.height, a.y + BRASIL_XY[i][1] * a.height}; };
+        const float(*xy)[2] = regiaoTela == 0 ? BRASIL_XY : MUNDO_XY;
+        const unsigned short* indices = regiaoTela == 0 ? BRASIL_INDICES : MUNDO_INDICES;
+        int triangulos = regiaoTela == 0 ? BRASIL_TRIANGULOS : MUNDO_TRIANGULOS;
+        auto ponto = [&](int i) { return Vector2{a.x + xy[i][0] * a.height, a.y + xy[i][1] * a.height}; };
         for (int camada = 0; camada < 2; camada++) {
-            for (int t = 0; t < BRASIL_TRIANGULOS; t++) {
-                Vector2 p1 = ponto(BRASIL_INDICES[t * 3]), p2 = ponto(BRASIL_INDICES[t * 3 + 1]), p3 = ponto(BRASIL_INDICES[t * 3 + 2]);
-                if (camada == 0) triangulo(mais(p1, 6, 9), mais(p2, 6, 9), mais(p3, 6, 9), Fade(BLACK, 0.18f));
+            for (int t = 0; t < triangulos; t++) {
+                Vector2 p1 = ponto(indices[t * 3]), p2 = ponto(indices[t * 3 + 1]), p3 = ponto(indices[t * 3 + 2]);
+                if (camada == 0) triangulo(mais(p1, 5, 7), mais(p2, 5, 7), mais(p3, 5, 7), Fade(BLACK, 0.16f));
                 else triangulo(p1, p2, p3, Color{132, 198, 98, 255});
             }
         }
-        for (int i = 0; i < BRASIL_PONTOS; i++) DrawLineEx(ponto(i), ponto((i + 1) % BRASIL_PONTOS), 3, Color{72, 138, 66, 255});
+        Color contorno = {72, 138, 66, 255};
+        if (regiaoTela == 0) {
+            for (int i = 0; i < BRASIL_PONTOS; i++) DrawLineEx(ponto(i), ponto((i + 1) % BRASIL_PONTOS), 3, contorno);
+        } else {
+            for (int anel = 0; anel < MUNDO_ANEIS; anel++) {
+                int inicio = MUNDO_ANEL[anel][0], n = MUNDO_ANEL[anel][1];
+                for (int i = 0; i < n; i++) DrawLineEx(ponto(inicio + i), ponto(inicio + (i + 1) % n), 2, contorno);
+            }
+            // Ponto de partida: o Brasil
+            Vector2 casa = pontoNoBrasil(MUNDO_SP, W, H);
+            DrawCircleV(casa, 11, WHITE);
+            DrawCircleV(casa, 8, COR_VERDE);
+            textoContorno("Brasil", casa.x, casa.y + 12, 20, WHITE, Color{40, 70, 40, 255}, 2);
+            desenharRota(casa, pontoNoBrasil(CAPITULOS[CAPITULOS_POR_REGIAO].posicao, W, H), -0.25f, Fade(WHITE, 0.95f));
+        }
 
         // Rota da viagem
-        for (int c = 0; c + 1 < TOTAL_CAPITULOS; c++) {
-            desenharRota(pontoNoBrasil(CAPITULOS[c].posicao, W, H), pontoNoBrasil(CAPITULOS[c + 1].posicao, W, H), 0.18f,
+        int primeiro = regiaoTela * CAPITULOS_POR_REGIAO;
+        for (int k = 0; k + 1 < CAPITULOS_POR_REGIAO; k++) {
+            desenharRota(pontoNoBrasil(CAPITULOS[primeiro + k].posicao, W, H),
+                         pontoNoBrasil(CAPITULOS[primeiro + k + 1].posicao, W, H), regiaoTela == 0 ? 0.18f : -0.2f,
                          Fade(WHITE, 0.95f));
         }
 
-        // Cidades
-        for (int c = 0; c < TOTAL_CAPITULOS; c++) {
+        // Cidades (no mapa-mundi, os nomes alternam em cima e embaixo para nao se misturar)
+        for (int k = 0; k < CAPITULOS_POR_REGIAO; k++) {
+            int c = primeiro + k;
             Vector2 p = pontoNoBrasil(CAPITULOS[c].posicao, W, H);
             int estado = estadoDoCapitulo(c);
-            if (viajando && c == viagemPara && tempoViagem < 2.6f) estado = 0;  // ainda nao chegou
-            desenharMarcadorCidade(p, estado, tempo);
-            string nome = CAPITULOS[c].curto;
-            float largura = larguraTexto(nome, 22);
-            bool esquerda = CAPITULOS[c].posicao[0] > 0.8f;
-            float x = esquerda ? p.x - 28 - largura / 2 : p.x + 28 + largura / 2;
-            textoContorno(nome, x, p.y - 13, 22, WHITE, Color{40, 70, 40, 255}, 2.5f);
+            if (viajando && c == viagemPara && tempoViagem < 2.8f) estado = 0;  // ainda nao chegou
+            desenharMarcadorCidade(p, estado, tempo, regiaoTela == 0 ? 1.0f : 0.78f);
+            string nome = CAPITULOS[c].rotulo;
+            if (regiaoTela == 0) {
+                float largura = larguraTexto(nome, 22);
+                bool esquerda = CAPITULOS[c].posicao[0] > 0.8f;
+                float x = esquerda ? p.x - 28 - largura / 2 : p.x + 28 + largura / 2;
+                textoContorno(nome, x, p.y - 13, 22, WHITE, Color{40, 70, 40, 255}, 2.5f);
+            } else {
+                // 0 = esquerda, 1 = embaixo, 2 = em cima (Europa fica apertada no mapa)
+                const int LADO[CAPITULOS_POR_REGIAO] = {0, 1, 2, 1, 2};
+                float x = p.x, y = p.y - 44;
+                if (LADO[k] == 0) {
+                    x = p.x - 22 - larguraTexto(nome, 20) / 2;
+                    y = p.y - 12;
+                } else if (LADO[k] == 1) {
+                    y = p.y + 18;
+                }
+                textoContorno(nome, x, y, 20, WHITE, Color{40, 70, 40, 255}, 2.5f);
+            }
         }
 
-        // Caminhao do Seu Ze (viajando ou parado na feira atual)
-        Vector2 onde = pontoNoBrasil(CAPITULOS[capituloAtual()].posicao, W, H);
-        float direcao = 1;
-        if (viajando) {
-            Vector2 de = pontoNoBrasil(CAPITULOS[viagemDe].posicao, W, H), para = pontoNoBrasil(CAPITULOS[viagemPara].posicao, W, H);
-            float t = suavizar(min(1.0f, tempoViagem / 2.6f));
-            onde = pontoNaRota(de, para, 0.18f, t);
-            direcao = para.x >= de.x ? 1.0f : -1.0f;
+        // Caminhao (Brasil) ou aviao (mundo) do Seu Ze
+        int atual = capituloAtual();
+        bool aquiNestaRegiao = atual / CAPITULOS_POR_REGIAO == regiaoTela;
+        if (aquiNestaRegiao || viajando) {
+            Vector2 onde = pontoNoBrasil(CAPITULOS[atual].posicao, W, H);
+            float direcao = 1;
+            if (viajando) {
+                Vector2 de = pontoDaViagem(viagemDe, W, H), para = pontoDaViagem(viagemPara, W, H);
+                float t = suavizar(min(1.0f, tempoViagem / 2.8f));
+                float curva = regiaoTela == 0 ? 0.18f : -0.25f;
+                onde = pontoNaRota(de, para, curva, t);
+                direcao = para.x >= de.x ? 1.0f : -1.0f;
+            }
+            if (regiaoTela == 0) desenharCaminhao(mais(onde, 0, -44), 0.95f, tempo, direcao);
+            else desenharAviao(mais(onde, 0, -40), 0.8f, tempo, direcao);
         }
-        desenharCaminhao(mais(onde, 0, -44), 0.95f, tempo, direcao);
 
-        // Cartoes das feiras
-        if (W > H) textoContorno("A viagem do Seu Zé", W * 0.52f + (W * 0.48f - 30) / 2, 150 + deslocamentoVertical(H, false), 36,
-                                 COR_CREME, Color{60, 90, 140, 255}, 3);
-        for (int c = 0; c < TOTAL_CAPITULOS; c++) {
-            Rectangle r = cartaoDaFeira(c, W, H);
+        // Abas e cartoes das feiras
+        bool podeTocar = !mostrarAjuda && postalAberto < 0;
+        for (int regiao = 0; regiao < 2; regiao++) {
+            Rectangle aba = abaDaRegiao(regiao, W, H);
+            bool bloqueada = regiao == 1 && !mundoLiberado();
+            Color cor = regiao == regiaoTela ? COR_AZUL : Color{150, 170, 196, 255};
+            if (bloqueada) cor = Color{160, 160, 160, 255};
+            desenharBotao({aba, regiao == 0 ? "BRASIL" : "MUNDO", cor, bloqueada ? SEM_ICONE : ICONE_MAPA, 24},
+                          podeTocar && dentro(mouse, aba) && !bloqueada);
+            if (bloqueada) desenharCadeado({aba.x + aba.width - 30, aba.y + aba.height / 2}, 0.7f, WHITE);
+        }
+        for (int k = 0; k < CAPITULOS_POR_REGIAO; k++) {
+            int c = primeiro + k;
+            Rectangle r = cartaoDaFeira(k, W, H);
             int estado = estadoDoCapitulo(c);
-            bool emCima = dentro(mouse, r) && estado != 0 && !mostrarAjuda;
+            bool emCima = dentro(mouse, r) && estado != 0 && podeTocar;
             DrawRectangleRounded({r.x + 3, r.y + 5, r.width, r.height}, 0.35f, 8, Fade(BLACK, 0.18f));
             DrawRectangleRounded(r, 0.35f, 8, estado == 0 ? Color{226, 222, 214, 255} : (emCima ? WHITE : COR_CREME));
             DrawRectangleRounded({r.x, r.y, 12, r.height}, 0.5f, 6, estado == 0 ? Color{180, 172, 162, 255} : CAPITULOS[c].toldoA);
-            desenharFruta(CAPITULOS[c].regionais[0], {r.x + 46, r.y + r.height / 2 + 2}, 0.62f);
-            desenharFruta(CAPITULOS[c].regionais[1], {r.x + 94, r.y + r.height / 2 + 2}, 0.62f);
+            desenharFruta(CAPITULOS[c].regionais[0], {r.x + 46, r.y + r.height / 2 + 2}, 0.6f);
+            desenharFruta(CAPITULOS[c].regionais[1], {r.x + 94, r.y + r.height / 2 + 2}, 0.6f);
             Color corTexto = estado == 0 ? Fade(COR_TEXTO, 0.45f) : COR_TEXTO;
-            texto(CAPITULOS[c].curto, r.x + 128, r.y + 8, 26, corTexto);
-            texto(CAPITULOS[c].feira, r.x + 128, r.y + 38, 17, Fade(corTexto, 0.7f));
+            texto(CAPITULOS[c].curto + string(regiaoTela == 1 ? " · " + string(CAPITULOS[c].rotulo) : ""), r.x + 128, r.y + 7, 25, corTexto);
+            texto(CAPITULOS[c].feira, r.x + 128, r.y + 37, 17, Fade(corTexto, 0.7f));
             Vector2 direita = {r.x + r.width - 60, r.y + r.height / 2};
             if (estado == 0) {
                 desenharCadeado(direita, 0.9f, Color{170, 162, 152, 255});
             } else if (estado == 1) {
-                string f = "Fase " + to_string(faseLiberada);
-                textoCentro(f, direita.x - 6, direita.y - 14, 22, COR_LARANJA);
+                textoCentro("Fase " + to_string(faseLiberada), direita.x - 6, direita.y - 14, 22, COR_LARANJA);
             } else {
                 desenharEstrela(mais(direita, -26, 0), 14, COR_OURO);
                 texto(to_string(estrelasDoCapitulo(c)) + "/30", direita.x - 8, direita.y - 12, 22, COR_TEXTO);
@@ -1025,7 +1200,6 @@ struct Jogo {
 
         // Barra de cima
         desenharToldo(W);
-        bool podeTocar = !mostrarAjuda && postalAberto < 0;
         desenharBotao({botaoInicioTopo(), "INÍCIO", COR_MARROM, ICONE_CASA, 24}, podeTocar && dentro(mouse, botaoInicioTopo()));
         desenharPilulaMoedas(pilulaMoedasTopo(W), moedas);
         desenharBotaoDesafio(W, mouse, tempo, podeTocar);
@@ -1035,7 +1209,9 @@ struct Jogo {
             string aviso = "Próxima parada: " + string(CAPITULOS[viagemPara].curto) + "!";
             float largura = larguraTexto(aviso, 30) + 50;
             float centro = a.x + a.width / 2;
-            Rectangle faixa = {centro - largura / 2, a.y - 4, largura, 52};
+            // No mapa-mundi a Europa fica no alto: o aviso vai para baixo, sobre o oceano
+            float topoFaixa = regiaoTela == 0 ? a.y - 10 : a.y + a.height - 56;
+            Rectangle faixa = {centro - largura / 2, topoFaixa, largura, 52};
             DrawRectangleRounded(faixa, 0.5f, 8, Fade(COR_LARANJA, 0.95f));
             textoCentro(aviso, centro, faixa.y + 9, 30, WHITE);
         }
@@ -1084,7 +1260,7 @@ struct Jogo {
     void tocarNoMapa(Vector2 p, float W, float H) {
         if (dentro(p, botaoInicioTopo())) {
             sons.tocar(sons.clique);
-            irParaBrasil();
+            irParaBrasil(capituloMapa / CAPITULOS_POR_REGIAO);
             return;
         }
         if (dentro(p, botaoDesafioTopo(W))) return tocarNoDesafio();
@@ -1211,7 +1387,7 @@ struct Jogo {
                     desenharEstrela(e, 11, k < ganhas ? COR_OURO : Color{230, 222, 210, 255});
                 }
             }
-            if (atual) desenharFeirante({p.x, p.y - raio - 4 + sinf(tempo * 3) * 3}, 0.42f, tempo, 1);
+            if (atual) desenharFeirante({p.x, p.y - raio - 4 + sinf(tempo * 3) * 3}, 0.42f, tempo, 1, capituloMapa);
         }
 
         // Faixas para os botoes fixos ficarem legiveis
@@ -1221,7 +1397,8 @@ struct Jogo {
         // Barra de cima e nome da feira
         desenharToldo(W, cap.toldoA, cap.toldoB);
         bool podeTocar = !mostrarAjuda && postalAberto < 0;
-        desenharBotao({botaoInicioTopo(), "BRASIL", COR_MARROM, ICONE_MAPA, 24}, podeTocar && dentro(mouse, botaoInicioTopo()));
+        desenharBotao({botaoInicioTopo(), capituloMapa < CAPITULOS_POR_REGIAO ? "BRASIL" : "MUNDO", COR_MARROM, ICONE_MAPA, 24},
+                      podeTocar && dentro(mouse, botaoInicioTopo()));
         desenharPilulaMoedas(pilulaMoedasTopo(W), moedas);
         desenharBotaoDesafio(W, mouse, tempo, podeTocar);
         float largura = min(W - 40, larguraTexto(cap.feira, 28) + 60);
@@ -1242,18 +1419,36 @@ struct Jogo {
     //  POSTAL: curiosidade da feira + receita, para mandar no WhatsApp
     // ============================================================
 
+    bool postalTemFoto() const { return postalAberto >= 0 && fotoDaFeira(postalAberto).tem; }
+
     Rectangle cartaoPostal(float W, float H) const {
-        float w = min(W - 30, 940.0f), h = W > H ? min(H - 40, 660.0f) : min(H - 80, 900.0f);
+        bool foto = postalTemFoto();
+        float w = min(W - 30, W > H && foto ? 1220.0f : 940.0f);
+        float h = W > H ? min(H - 40, 660.0f) : min(H - 80, foto ? 1060.0f : 900.0f);
         return {W / 2 - w / 2, H / 2 - h / 2, w, h};
     }
-    Rectangle botaoWhatsApp(float W, float H) const {
+    // Onde fica a foto: coluna da esquerda (tela deitada) ou faixa de cima (tela em pe)
+    Rectangle fotoDoPostal(float W, float H) const {
         Rectangle c = cartaoPostal(W, H);
-        float bw = min(320.0f, (c.width - 60) / 2);
-        return {W / 2 - bw - 10, c.y + c.height - 100, bw, 74};
+        if (W > H) return {c.x + 30, c.y + 40, c.width * 0.36f, c.height - 70};
+        return {c.x + 26, c.y + 36, c.width - 52, (c.width - 52) * 0.56f};
+    }
+    // Area do texto e dos botoes
+    Rectangle textoDoPostal(float W, float H) const {
+        Rectangle c = cartaoPostal(W, H);
+        if (!postalTemFoto()) return {c.x + 36, c.y + 40, c.width - 72, c.height - 40};
+        Rectangle f = fotoDoPostal(W, H);
+        if (W > H) return {f.x + f.width + 30, c.y + 40, c.x + c.width - 30 - (f.x + f.width + 30), c.height - 40};
+        return {c.x + 36, f.y + f.height + 24, c.width - 72, c.y + c.height - (f.y + f.height + 24)};
+    }
+    Rectangle botaoWhatsApp(float W, float H) const {
+        Rectangle c = cartaoPostal(W, H), t = textoDoPostal(W, H);
+        float bw = min(320.0f, (t.width - 20) / 2), meio = t.x + t.width / 2;
+        return {meio - bw - 10, c.y + c.height - 100, bw, 74};
     }
     Rectangle botaoFecharPostal(float W, float H) const {
         Rectangle b = botaoWhatsApp(W, H);
-        return {W / 2 + 10, b.y, b.width, b.height};
+        return {b.x + b.width + 20, b.y, b.width, b.height};
     }
 
     void fecharPostal() {
@@ -1263,7 +1458,8 @@ struct Jogo {
             viagemDe = capituloDaFase(faseLiberada - 1);
             viagemPara = capituloAtual();
             tempoViagem = 0;
-            irParaBrasil();
+            irParaBrasil(viagemPara / CAPITULOS_POR_REGIAO);
+            if (viagemPara == 0) viajando = false;  // volta ao comeco: sem animacao
         }
         postalAberto = -1;
         postalDaConquista = false;
@@ -1292,6 +1488,30 @@ struct Jogo {
             DrawRectangle((int)(x + 18), (int)(c.y + 12), 18, 8, Color{60, 110, 190, 255});
         }
 
+        // Foto do mercado, como uma fotografia colada no postal
+        bool comFoto = postalTemFoto();
+        if (comFoto) {
+            const FotoDaFeira& foto = fotoDaFeira(postalAberto);
+            Rectangle f = fotoDoPostal(W, H);
+            DrawRectangleRec({f.x - 8 + 4, f.y - 8 + 8, f.width + 16, f.height + 16}, Fade(BLACK, 0.18f));
+            DrawRectangleRec({f.x - 8, f.y - 8, f.width + 16, f.height + 16}, WHITE);
+            desenharFotoCobrindo(foto.nitida, f);
+            if (!foto.credito.empty()) {
+                // Credito do fotografo: diminui a letra e, se ainda nao couber, usa duas linhas
+                float tc = 15;
+                while (larguraTexto(foto.credito, tc) > f.width - 16 && tc > 11) tc -= 1;
+                vector<string> linhas = quebrarLinhas(foto.credito, f.width - 16, tc);
+                float alturaFaixa = linhas.size() * tc * 1.15f + 20;
+                DrawRectangleGradientV((int)f.x, (int)(f.y + f.height - alturaFaixa), (int)f.width, (int)alturaFaixa,
+                                       Fade(BLACK, 0), Fade(BLACK, 0.65f));
+                float yc = f.y + f.height - 7 - linhas.size() * tc * 1.15f;
+                for (const string& l : linhas) {
+                    texto(l, f.x + 8, yc, tc, Fade(WHITE, 0.92f));
+                    yc += tc * 1.15f;
+                }
+            }
+        }
+
         // Selo com a fruta da regiao
         Rectangle selo = {c.x + c.width - 130, c.y + 36, 100, 118};
         for (float x = selo.x; x <= selo.x + selo.width; x += 10) {
@@ -1313,17 +1533,22 @@ struct Jogo {
         }
 
         // Textos: diminui a letra ate caber
-        float margem = 36, larguraTextoMax = c.width - 2 * margem;
-        float topo = c.y + 40;
-        textoContorno("Lembrança de " + string(cap.curto), c.x + margem + larguraTexto("Lembrança de " + string(cap.curto), 40) / 2,
-                      topo, 40, cap.toldoA, WHITE, 2);
-        texto(cap.feira, c.x + margem, topo + 50, 24, Fade(COR_TEXTO, 0.7f));
+        Rectangle area = textoDoPostal(W, H);
+        float x0 = area.x, larguraTextoMax = area.width;
+        float topo = area.y;
+        // o selo fica no canto de cima; na tela em pe com foto, ele fica em cima da foto
+        bool seloAtrapalha = !(comFoto && W < H);
+        string titulo = cap.lembranca;
+        float tamanhoTitulo = 40;
+        while (larguraTexto(titulo, tamanhoTitulo) > larguraTextoMax - (seloAtrapalha ? 150 : 0) && tamanhoTitulo > 26) tamanhoTitulo -= 2;
+        textoContorno(titulo, x0 + larguraTexto(titulo, tamanhoTitulo) / 2, topo, tamanhoTitulo, escurecer(cap.toldoA, 0.1f), WHITE, 2);
+        texto(cap.feira, x0, topo + 50, 24, Fade(COR_TEXTO, 0.7f));
         Rectangle zapRet = botaoWhatsApp(W, H);
-        float yTexto = topo + 128, limite = zapRet.y - 120;
+        float yTexto = topo + (comFoto && W < H ? 92 : 128), limite = zapRet.y - 120;
         float t1 = W > H ? 26 : 30, t2 = W > H ? 23 : 26;
         vector<string> curiosidade, receita;
         while (true) {
-            curiosidade = quebrarLinhas(cap.curiosidade, larguraTextoMax - (yTexto < selo.y + selo.height ? 110 : 0), t1);
+            curiosidade = quebrarLinhas(cap.curiosidade, larguraTextoMax - (seloAtrapalha && yTexto < selo.y + selo.height ? 110 : 0), t1);
             receita = quebrarLinhas(cap.receita, larguraTextoMax, t2);
             float altura = curiosidade.size() * t1 * 1.25f + 24 + t1 * 1.4f + receita.size() * t2 * 1.25f;
             if (yTexto + altura <= limite || t2 <= 15) break;
@@ -1332,22 +1557,22 @@ struct Jogo {
         }
         float y = yTexto;
         for (const string& l : curiosidade) {
-            texto(l, c.x + margem, y, t1, COR_TEXTO);
+            texto(l, x0, y, t1, COR_TEXTO);
             y += t1 * 1.25f;
         }
         y += 10;
-        DrawLineEx({c.x + margem, y}, {c.x + c.width - margem, y}, 2, Color{226, 210, 186, 255});
+        DrawLineEx({x0, y}, {x0 + larguraTextoMax, y}, 2, Color{226, 210, 186, 255});
         y += 14;
-        texto("Receita: " + string(cap.receitaTitulo), c.x + margem, y, t1 + 2, COR_LARANJA);
+        texto("Receita: " + string(cap.receitaTitulo), x0, y, t1 + 2, COR_LARANJA);
         y += t1 * 1.4f;
         for (const string& l : receita) {
-            texto(l, c.x + margem, y, t2, COR_TEXTO);
+            texto(l, x0, y, t2, COR_TEXTO);
             y += t2 * 1.25f;
         }
 
         // Assinatura
-        desenharFeirante({c.x + 80, zapRet.y - 14}, 0.45f, (float)GetTime(), 1);
-        texto("Um abraço do Seu Zé!", c.x + 138, zapRet.y - 64, 26, Fade(COR_TEXTO, 0.8f));
+        desenharFeirante({x0 + 44, zapRet.y - 14}, 0.45f, (float)GetTime(), 1, postalAberto);
+        texto("Um abraço do Seu Zé!", x0 + 102, zapRet.y - 64, 26, Fade(COR_TEXTO, 0.8f));
 
         Rectangle zap = zapRet, fechar = botaoFecharPostal(W, H);
         desenharBotao({zap, "WHATSAPP", Color{37, 170, 90, 255}, SEM_ICONE, 28}, dentro(mouse, zap));
@@ -1399,7 +1624,7 @@ struct Jogo {
         // Seu Ze atras do balcao
         Vector2 ze = retrato ? Vector2{W * 0.3f, mesa + 10} : Vector2{W * 0.16f, mesa + 10};
         float escalaZe = retrato ? 1.3f : 1.25f;
-        desenharFeirante(ze, escalaZe, tempo, 1);
+        desenharFeirante(ze, escalaZe, tempo, 1, capituloAtual());
         desenharPrateleira(W, mesa);
         desenharToalha(W, mesa + 26, H);
 
@@ -1593,8 +1818,9 @@ void quadro() {
         sobreClicavel = dentro(mouse, jogo.botaoInicioTopo()) || dentro(mouse, jogo.botaoDesafioTopo(W)) ||
                         dentro(mouse, jogo.botaoJogarBaixo(W, H));
         if (jogo.tela == BRASIL)
-            for (int c = 0; c < TOTAL_CAPITULOS; c++)
-                if (dentro(mouse, jogo.cartaoDaFeira(c, W, H)) && jogo.estadoDoCapitulo(c) != 0) sobreClicavel = true;
+            for (int c = 0; c < CAPITULOS_POR_REGIAO; c++)
+                if (dentro(mouse, jogo.cartaoDaFeira(c, W, H)) && jogo.estadoDoCapitulo(jogo.regiaoTela * CAPITULOS_POR_REGIAO + c) != 0)
+                    sobreClicavel = true;
     }
     else if (jogo.ganhou)
         sobreClicavel = dentro(mouse, jogo.botaoVitoriaMapa(L)) || dentro(mouse, jogo.botaoVitoriaProxima(L));
